@@ -1,0 +1,24 @@
+@import "tailwindcss";
+
+body { 
+  font-family: 'Inter', sans-serif; 
+  background-color: #fcfcfc; 
+  margin: 0; 
+}
+.mono { 
+  font-family: 'JetBrains Mono', monospace; 
+}
+.nav-item.active { 
+  background-color: #f3f4f6; 
+  color: #2563eb; 
+  border-right: 3px solid #2563eb; 
+}
+
+/* 瀑布流防止卡片被中间切断 */
+.break-inside-avoid { break-inside: avoid; }
+
+.fund-card { transition: all 0.2s ease-out; }
+.fund-card:hover { transform: translateY(-4px); box-shadow: 0 12px 24px rgba(0,0,0,0.06); }
+
+/* 隐藏滚动条 */
+.no-scrollbar::-webkit-scrollbar { display: none; }

@@ -1,0 +1,121 @@
+use serde::{Deserialize, Serialize};
+use std::io::{BufRead, BufReader, Write};
+use std::process::{Child, ChildStdin, ChildStdout, Command, Stdio};
+use std::sync::{Arc, Mutex};
+
+#[derive(Serialize)]
+pub struct JsonRpcRequest {
+    pub jsonrpc: String,
+    pub method: String,
+    pub params: serde_json::Value,
+    pub id: u64,
+}
+
+#[derive(Deserialize, Debug)]
+pub struct JsonRpcResponse {
+    pub jsonrpc: String,
+    pub result: Option<serde_json::Value>,
+    pub error: Option<serde_json::Value>,
+    pub id: Option<u64>,
+}
+
+pub struct EngineManager {
+    child: Option<Child>,
+    req_id: u64,
+}
+
+impl EngineManager {
+    pub fn new() -> Self {
+        Self {
+            child: None,
+            req_id: 1,
+        }
+    }
+
+    pub fn start(&mut self, is_prod: bool) -> Result<(), String> {
+        if self.child.is_some() {
+            return Ok(());
+        }
+
+        let mut cmd = if is_prod {
+            // In production, run the PyInstaller bundled executable
+            Command::new("binaries/engine")
+        } else {
+            // In development, run python directly
+            // Ensure we use the venv python if available, else fallback to python3
+            let python_bin = if std::path::Path::new(".venv/bin/python").exists() {
+                ".venv/bin/python"
+            } else {
+                "python3"
+            };
+
+            let mut c = Command::new(python_bin);
+            c.arg("src-python/main.py");
+            c
+        };
+
+        cmd.stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::inherit()); // Forward stderr to the terminal for debugging
+
+        let child = cmd
+            .spawn()
+            .map_err(|e| format!("Failed to spawn engine: {}", e))?;
+        self.child = Some(child);
+
+        Ok(())
+    }
+
+    pub fn stop(&mut self) -> Result<(), String> {
+        if let Some(mut child) = self.child.take() {
+            let _ = child.kill();
+            let _ = child.wait();
+        }
+        Ok(())
+    }
+
+    pub fn invoke(
+        &mut self,
+        method: &str,
+        params: serde_json::Value,
+    ) -> Result<serde_json::Value, String> {
+        let child = self.child.as_mut().ok_or("Engine is not running")?;
+
+        let stdin = child.stdin.as_mut().ok_or("Failed to get stdin")?;
+
+        let req = JsonRpcRequest {
+            jsonrpc: "2.0".to_string(),
+            method: method.to_string(),
+            params,
+            id: self.req_id,
+        };
+        self.req_id += 1;
+
+        let req_str = serde_json::to_string(&req).map_err(|e| e.to_string())?;
+
+        // Write to stdin
+        stdin
+            .write_all(format!("{}\n", req_str).as_bytes())
+            .map_err(|e| e.to_string())?;
+        stdin.flush().map_err(|e| e.to_string())?;
+
+        // Read from stdout
+        let stdout = child.stdout.as_mut().ok_or("Failed to get stdout")?;
+        let mut reader = BufReader::new(stdout);
+        let mut line = String::new();
+        reader.read_line(&mut line).map_err(|e| e.to_string())?;
+
+        if line.is_empty() {
+            return Err("Engine closed the connection".to_string());
+        }
+
+        let res: JsonRpcResponse = serde_json::from_str(&line).map_err(|e| e.to_string())?;
+
+        if let Some(err) = res.error {
+            return Err(err.to_string());
+        }
+
+        res.result
+            .ok_or_else(|| "No result in response".to_string())
+    }
+}

@@ -7,4 +7,4 @@ data/*.db
 dist/
 .DS_Store
 *.log
-.env
+.envbackups/

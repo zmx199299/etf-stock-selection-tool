@@ -7,13 +7,5 @@ import { RouterView } from 'vue-router'
 </template>
 
 <style>
-* {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
-}
-body {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  background: #f5f5f5;
-}
+/* 移除之前的全局样式，使用 style.css 中的设定 */
 </style>
