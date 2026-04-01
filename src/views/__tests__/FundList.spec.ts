@@ -40,6 +40,13 @@ describe('FundList', () => {
     expect(localStorage.getItem(COLOR_MODE_STORAGE_KEY)).toBe('intl')
   })
 
+  it('波动率按后端比率数据转换为百分比显示，并复用共享上涨语义类名', () => {
+    const wrapper = mount(FundList)
+
+    expect(wrapper.text()).toContain('1.72%')
+    expect(wrapper.get('[data-test="change-510300"]').classes()).toContain('text-red-500')
+  })
+
   it('点击详情分析会跳转到 analysis 路由', async () => {
     const wrapper = mount(FundList)
 

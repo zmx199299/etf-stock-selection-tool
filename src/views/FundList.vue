@@ -81,7 +81,11 @@
                 <td class="px-4 py-3 text-right font-mono" :class="getSubtleDirectionClass(row.high - row.prevClose)">{{ formatPrice(row.high) }}</td>
                 <td class="px-4 py-3 text-right font-mono" :class="getSubtleDirectionClass(row.low - row.prevClose)">{{ formatPrice(row.low) }}</td>
                 <td class="px-4 py-3 text-right font-mono text-slate-600">{{ formatPercent(row.volatility) }}</td>
-                <td class="px-4 py-3 text-right font-mono font-semibold" :class="getValueDirectionClass(row.changePct)">
+                <td
+                  :data-test="`change-${row.code}`"
+                  class="px-4 py-3 text-right font-mono font-semibold"
+                  :class="getValueDirectionClass(row.changePct)"
+                >
                   {{ formatSignedPercent(row.changePct) }}
                 </td>
                 <td class="px-4 py-3 text-center" :class="getSoftDirectionClass(row.macd.signal)">{{ row.macd.value }}</td>
@@ -144,7 +148,7 @@ const mockFunds: FundListItem[] = [
     close: 4.123,
     high: 4.15,
     low: 4.08,
-    volatility: Number((((4.15 - 4.08) / 4.08) * 100).toFixed(2)),
+    volatility: (4.15 - 4.08) / 4.08,
     macd: { signal: 'bullish', value: '金叉' },
     rsi: { signal: 'neutral', value: '52' },
     boll: { signal: 'bullish', value: '中轨' },
@@ -160,7 +164,7 @@ const mockFunds: FundListItem[] = [
     close: 2.256,
     high: 2.28,
     low: 2.23,
-    volatility: Number((((2.28 - 2.23) / 2.23) * 100).toFixed(2)),
+    volatility: (2.28 - 2.23) / 2.23,
     macd: { signal: 'bullish', value: '红柱' },
     rsi: { signal: 'bullish', value: '68' },
     boll: { signal: 'bullish', value: '下轨' },
@@ -176,7 +180,7 @@ const mockFunds: FundListItem[] = [
     close: 6.789,
     high: 6.82,
     low: 6.75,
-    volatility: Number((((6.82 - 6.75) / 6.75) * 100).toFixed(2)),
+    volatility: (6.82 - 6.75) / 6.75,
     macd: { signal: 'bearish', value: '死叉' },
     rsi: { signal: 'neutral', value: '48' },
     boll: { signal: 'neutral', value: '中轨' },
@@ -192,7 +196,7 @@ const mockFunds: FundListItem[] = [
     close: 1.03,
     high: 1.06,
     low: 1.02,
-    volatility: Number((((1.06 - 1.02) / 1.02) * 100).toFixed(2)),
+    volatility: (1.06 - 1.02) / 1.02,
     macd: { signal: 'bearish', value: '绿柱' },
     rsi: { signal: 'bearish', value: '25' },
     boll: { signal: 'bearish', value: '上轨' },
@@ -213,7 +217,7 @@ function formatPrice(value: number) {
 }
 
 function formatPercent(value: number) {
-  return `${value.toFixed(2)}%`
+  return `${(value * 100).toFixed(2)}%`
 }
 
 function formatSignedPercent(value: number) {
