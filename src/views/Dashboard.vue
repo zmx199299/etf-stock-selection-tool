@@ -160,7 +160,6 @@ async function fetchSignals() {
 }
 
 onMounted(() => {
-  colorMode.hydrate()
   fetchSignals()
 })
 </script>

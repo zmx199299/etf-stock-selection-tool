@@ -33,4 +33,16 @@ describe('Dashboard', () => {
 
     expect(wrapper.get('[data-test="dashboard-change-513130"]').classes()).toContain('text-green-600')
   })
+
+  it('页面挂载不会重置已有共享配色状态', async () => {
+    const colorModeStore = useColorModeStore()
+    colorModeStore.setMode('intl')
+    localStorage.removeItem('market-color-mode')
+
+    const wrapper = mount(Dashboard)
+
+    await flushPromises()
+
+    expect(wrapper.get('[data-test="dashboard-change-513130"]').classes()).toContain('text-green-600')
+  })
 })
