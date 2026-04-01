@@ -1,7 +1,7 @@
 import { scoreToDirection, type MarketDirection } from './marketColors'
 
 export type TechnicalValue = {
-  value: number
+  value: string
   signal: MarketDirection
 }
 
