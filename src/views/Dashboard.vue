@@ -30,7 +30,7 @@
             
             <div class="flex justify-between items-end mb-6">
                 <div class="flex flex-col">
-                    <span :class="signal.change_pct >= 0 ? 'text-red-500' : 'text-green-500'" class="text-3xl font-black leading-none tabular-nums">{{ signal.change_pct >= 0 ? '+' : '' }}{{ signal.change_pct.toFixed(2) }}%</span>
+                    <span :data-test="`dashboard-change-${signal.code}`" :class="paletteFor(signal.change_pct).valueClass" class="text-3xl font-black leading-none tabular-nums">{{ signal.change_pct >= 0 ? '+' : '' }}{{ signal.change_pct.toFixed(2) }}%</span>
                     <div class="flex gap-4 mt-3">
                         <div class="flex flex-col">
                           <span class="text-[10px] text-gray-400 font-bold uppercase tracking-tighter">净值(IOPV)</span>
@@ -38,8 +38,8 @@
                           <span class="text-[10px] font-mono text-gray-400 mt-0.5">{{ formatNavDate(signal.nav_date) }}</span>
                         </div>
                         <div class="flex flex-col border-l border-gray-100 pl-4">
-                          <span :class="signal.premium_rate >= 0 ? 'text-red-400' : 'text-green-500'" class="text-[10px] opacity-80 font-bold uppercase tracking-tighter">实时溢价</span>
-                          <span :class="signal.premium_rate >= 0 ? 'text-red-500' : 'text-green-600'" class="text-[13px] font-mono font-bold leading-tight">{{ signal.premium_rate > 0 ? '+' : '' }}{{ signal.premium_rate.toFixed(2) }}%</span>
+                          <span :class="paletteFor(signal.premium_rate).softTextClass" class="text-[10px] opacity-80 font-bold uppercase tracking-tighter">实时溢价</span>
+                          <span :class="paletteFor(signal.premium_rate).valueClass" class="text-[13px] font-mono font-bold leading-tight">{{ signal.premium_rate > 0 ? '+' : '' }}{{ signal.premium_rate.toFixed(2) }}%</span>
                         </div>
                     </div>
                 </div>
@@ -52,8 +52,8 @@
             </div>
             
             <div class="h-1.5 w-full bg-gray-100 rounded-full flex overflow-hidden">
-                <div class="bg-red-400" :style="{ width: riskWidth(signal) + '%' }"></div>
-                <div class="bg-green-400 flex-1 ml-0.5"></div>
+                <div :class="barClass('bearish')" :style="{ width: riskWidth(signal) + '%' }"></div>
+                <div :class="[barClass('bullish'), 'flex-1 ml-0.5']"></div>
             </div>
         </div>
 
@@ -70,8 +70,12 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 
+import { useColorModeStore } from '../stores/colorMode'
+import { getDirectionPalette, numericToDirection } from '../utils/marketColors'
+
 const router = useRouter()
-const isDev = import.meta.env.DEV
+const colorMode = useColorModeStore()
+const isDev = import.meta.env.DEV || import.meta.env.MODE === 'test'
 
 interface DashboardSignal {
   code: string
@@ -119,6 +123,14 @@ function riskWidth(signal: DashboardSignal): number {
   return Math.round((signal.max_loss_pct / total) * 100)
 }
 
+function paletteFor(value: number) {
+  return getDirectionPalette(colorMode.mode, numericToDirection(value))
+}
+
+function barClass(direction: 'bullish' | 'bearish') {
+  return getDirectionPalette(colorMode.mode, direction).barClass
+}
+
 function formatCode(code: string): string {
   const suffix = code.startsWith('6') || code.startsWith('5') ? '.SH' : '.SZ'
   return code + suffix
@@ -148,6 +160,7 @@ async function fetchSignals() {
 }
 
 onMounted(() => {
+  colorMode.hydrate()
   fetchSignals()
 })
 </script>
