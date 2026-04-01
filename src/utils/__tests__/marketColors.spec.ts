@@ -11,6 +11,15 @@ describe('marketColors', () => {
     expect(getDirectionPalette('intl', 'bullish').valueClass).toBe('text-green-600')
   })
 
+  it('返回收敛后的调色板字段集合', () => {
+    expect(getDirectionPalette('cn', 'bullish')).toEqual({
+      valueClass: 'text-red-500',
+      softTextClass: 'text-red-400',
+      dotClass: 'bg-red-500',
+      barClass: 'bg-red-500',
+    })
+  })
+
   it('numericToDirection() 依据数值返回方向', () => {
     expect(numericToDirection(1.2)).toBe('bullish')
     expect(numericToDirection(0)).toBe('neutral')

@@ -4,36 +4,50 @@ export type MarketDirection = 'bullish' | 'bearish' | 'neutral'
 
 type DirectionPalette = {
   valueClass: string
-  accentClass: string
+  softTextClass: string
+  dotClass: string
+  barClass: string
 }
 
 const PALETTES: Record<ColorMode, Record<MarketDirection, DirectionPalette>> = {
   cn: {
     bullish: {
       valueClass: 'text-red-500',
-      accentClass: 'text-red-400',
+      softTextClass: 'text-red-400',
+      dotClass: 'bg-red-500',
+      barClass: 'bg-red-500',
     },
     bearish: {
       valueClass: 'text-green-600',
-      accentClass: 'text-green-500',
+      softTextClass: 'text-green-500',
+      dotClass: 'bg-green-500',
+      barClass: 'bg-green-500',
     },
     neutral: {
       valueClass: 'text-gray-500',
-      accentClass: 'text-gray-400',
+      softTextClass: 'text-gray-400',
+      dotClass: 'bg-gray-400',
+      barClass: 'bg-gray-400',
     },
   },
   intl: {
     bullish: {
       valueClass: 'text-green-600',
-      accentClass: 'text-green-500',
+      softTextClass: 'text-green-500',
+      dotClass: 'bg-green-500',
+      barClass: 'bg-green-500',
     },
     bearish: {
       valueClass: 'text-red-500',
-      accentClass: 'text-red-400',
+      softTextClass: 'text-red-400',
+      dotClass: 'bg-red-500',
+      barClass: 'bg-red-500',
     },
     neutral: {
       valueClass: 'text-gray-500',
-      accentClass: 'text-gray-400',
+      softTextClass: 'text-gray-400',
+      dotClass: 'bg-gray-400',
+      barClass: 'bg-gray-400',
     },
   },
 }
