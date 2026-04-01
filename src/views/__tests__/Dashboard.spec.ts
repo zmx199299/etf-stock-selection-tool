@@ -20,18 +20,24 @@ describe('Dashboard', () => {
     setActivePinia(createPinia())
   })
 
-  it('挂载后默认使用 cn 配色，并在切换到 intl 后同步更新涨跌类名', async () => {
+  it('挂载后默认使用 cn 配色，并在切换到 intl 后同步更新首页关键语义颜色', async () => {
     const wrapper = mount(Dashboard)
     const colorModeStore = useColorModeStore()
 
     await flushPromises()
 
     expect(wrapper.get('[data-test="dashboard-change-513130"]').classes()).toContain('text-red-500')
+    expect(wrapper.get('[data-test="dashboard-premium-513130"]').classes()).toContain('text-red-500')
+    expect(wrapper.get('[data-test="dashboard-risk-bullish-513130"]').classes()).toContain('bg-red-500')
+    expect(wrapper.get('[data-test="dashboard-risk-bearish-513130"]').classes()).toContain('bg-green-500')
 
     colorModeStore.setMode('intl')
     await flushPromises()
 
     expect(wrapper.get('[data-test="dashboard-change-513130"]').classes()).toContain('text-green-600')
+    expect(wrapper.get('[data-test="dashboard-premium-513130"]').classes()).toContain('text-green-600')
+    expect(wrapper.get('[data-test="dashboard-risk-bullish-513130"]').classes()).toContain('bg-green-500')
+    expect(wrapper.get('[data-test="dashboard-risk-bearish-513130"]').classes()).toContain('bg-red-500')
   })
 
   it('页面挂载不会重置已有共享配色状态', async () => {

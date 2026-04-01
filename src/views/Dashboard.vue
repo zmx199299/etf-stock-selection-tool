@@ -39,7 +39,7 @@
                         </div>
                         <div class="flex flex-col border-l border-gray-100 pl-4">
                           <span :class="paletteFor(signal.premium_rate).softTextClass" class="text-[10px] opacity-80 font-bold uppercase tracking-tighter">实时溢价</span>
-                          <span :class="paletteFor(signal.premium_rate).valueClass" class="text-[13px] font-mono font-bold leading-tight">{{ signal.premium_rate > 0 ? '+' : '' }}{{ signal.premium_rate.toFixed(2) }}%</span>
+                          <span :data-test="`dashboard-premium-${signal.code}`" :class="paletteFor(signal.premium_rate).valueClass" class="text-[13px] font-mono font-bold leading-tight">{{ signal.premium_rate > 0 ? '+' : '' }}{{ signal.premium_rate.toFixed(2) }}%</span>
                         </div>
                     </div>
                 </div>
@@ -52,8 +52,8 @@
             </div>
             
             <div class="h-1.5 w-full bg-gray-100 rounded-full flex overflow-hidden">
-                <div :class="barClass('bearish')" :style="{ width: riskWidth(signal) + '%' }"></div>
-                <div :class="[barClass('bullish'), 'flex-1 ml-0.5']"></div>
+                <div :data-test="`dashboard-risk-bearish-${signal.code}`" :class="barClass('bearish')" :style="{ width: riskWidth(signal) + '%' }"></div>
+                <div :data-test="`dashboard-risk-bullish-${signal.code}`" :class="[barClass('bullish'), 'flex-1 ml-0.5']"></div>
             </div>
         </div>
 
