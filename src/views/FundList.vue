@@ -1,11 +1,11 @@
 <template>
   <section class="min-h-full bg-slate-50 p-4 md:p-6">
-    <div class="mx-auto flex max-w-7xl flex-col gap-4">
+    <div class="flex w-full flex-col gap-4">
       <div class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm md:p-5">
         <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div class="space-y-1">
-            <h1 class="text-2xl font-semibold tracking-tight text-slate-900">场内基金宽表</h1>
-            <p class="text-sm text-slate-500">共 {{ filteredRows.length }} / {{ rows.length }} 只基金，支持代码和名称搜索</p>
+            <h1 class="text-2xl font-semibold tracking-tight text-slate-900">全量场内基金（不含货币/债券基金）</h1>
+            <p class="text-sm text-slate-500">共监测{{ rows.length }}支</p>
           </div>
 
           <div class="flex flex-col gap-3 md:flex-row md:items-center">
@@ -70,10 +70,15 @@
                 class="border-t border-slate-100 align-middle transition hover:bg-slate-50/80"
               >
                 <td class="px-4 py-3">
-                  <div class="flex flex-col gap-1">
+                  <button
+                    :data-test="`xueqiu-${row.code}`"
+                    type="button"
+                    class="flex flex-col gap-1 text-left transition hover:opacity-80"
+                    @click="openXueqiu(row.code)"
+                  >
                     <span class="font-mono text-sm font-semibold text-slate-900">{{ row.code }}</span>
                     <span class="text-sm text-slate-600">{{ row.name }}</span>
-                  </div>
+                  </button>
                 </td>
                 <td class="px-4 py-3 text-right font-mono text-slate-600">{{ formatPrice(row.prevClose) }}</td>
                 <td class="px-4 py-3 text-right font-mono text-slate-600">{{ formatPrice(row.open) }}</td>
@@ -249,6 +254,11 @@ function goToAnalysis(code: string) {
     name: 'analysis',
     query: { code },
   })
+}
+
+function openXueqiu(code: string) {
+  const market = code.startsWith('5') || code.startsWith('6') ? 'SH' : 'SZ'
+  window.open(`https://xueqiu.com/S/${market}${code}`, '_blank', 'noopener,noreferrer')
 }
 
 async function fetchFunds() {
