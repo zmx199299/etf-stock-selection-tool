@@ -40,11 +40,16 @@ describe('FundList', () => {
     expect(localStorage.getItem(COLOR_MODE_STORAGE_KEY)).toBe('intl')
   })
 
-  it('波动率按后端比率数据转换为百分比显示，并复用共享上涨语义类名', () => {
+  it('波动率按后端比率数据转换为百分比显示，并随共享颜色模式切换上涨语义类名', async () => {
     const wrapper = mount(FundList)
+    const changeCell = wrapper.get('[data-test="change-510300"]')
 
     expect(wrapper.text()).toContain('1.72%')
-    expect(wrapper.get('[data-test="change-510300"]').classes()).toContain('text-red-500')
+    expect(changeCell.classes()).toContain('text-red-500')
+
+    await wrapper.get('[data-test="mode-intl"]').trigger('click')
+
+    expect(wrapper.get('[data-test="change-510300"]').classes()).toContain('text-green-600')
   })
 
   it('点击详情分析会跳转到 analysis 路由', async () => {
