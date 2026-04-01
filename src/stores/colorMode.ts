@@ -16,6 +16,10 @@ export const useColorModeStore = defineStore('colorMode', () => {
   const hydrated = ref(false)
 
   function hydrate() {
+    if (hydrated.value) {
+      return
+    }
+
     const storedMode = localStorage.getItem(COLOR_MODE_STORAGE_KEY)
     mode.value = isColorMode(storedMode) ? storedMode : DEFAULT_COLOR_MODE
     hydrated.value = true

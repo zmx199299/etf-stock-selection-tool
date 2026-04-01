@@ -20,6 +20,18 @@ describe('marketColors', () => {
     })
   })
 
+  it('返回值的修改不会污染后续调用', () => {
+    const palette = getDirectionPalette('cn', 'bullish')
+    palette.valueClass = 'text-blue-500'
+
+    expect(getDirectionPalette('cn', 'bullish')).toEqual({
+      valueClass: 'text-red-500',
+      softTextClass: 'text-red-400',
+      dotClass: 'bg-red-500',
+      barClass: 'bg-red-500',
+    })
+  })
+
   it('numericToDirection() 依据数值返回方向', () => {
     expect(numericToDirection(1.2)).toBe('bullish')
     expect(numericToDirection(0)).toBe('neutral')
@@ -28,7 +40,9 @@ describe('marketColors', () => {
 
   it('scoreToDirection() 依据评分返回方向', () => {
     expect(scoreToDirection(9)).toBe('bullish')
+    expect(scoreToDirection(7)).toBe('bullish')
     expect(scoreToDirection(5)).toBe('neutral')
+    expect(scoreToDirection(4)).toBe('neutral')
     expect(scoreToDirection(2)).toBe('bearish')
   })
 })

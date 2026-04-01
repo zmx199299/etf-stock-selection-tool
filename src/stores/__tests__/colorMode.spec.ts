@@ -36,4 +36,30 @@ describe('colorMode store', () => {
     expect(store.mode).toBe('cn')
     expect(store.hydrated).toBe(true)
   })
+
+  it('重复 hydrate() 不会再次覆盖当前内存态', () => {
+    localStorage.setItem(COLOR_MODE_STORAGE_KEY, 'intl')
+    const store = useColorModeStore()
+
+    store.hydrate()
+    store.setMode('cn')
+    localStorage.setItem(COLOR_MODE_STORAGE_KEY, 'intl')
+
+    store.hydrate()
+
+    expect(store.mode).toBe('cn')
+    expect(store.hydrated).toBe(true)
+  })
+
+  it('toggleMode() 会切换模式并持久化', () => {
+    const store = useColorModeStore()
+
+    store.toggleMode()
+    expect(store.mode).toBe('intl')
+    expect(localStorage.getItem(COLOR_MODE_STORAGE_KEY)).toBe('intl')
+
+    store.toggleMode()
+    expect(store.mode).toBe('cn')
+    expect(localStorage.getItem(COLOR_MODE_STORAGE_KEY)).toBe('cn')
+  })
 })

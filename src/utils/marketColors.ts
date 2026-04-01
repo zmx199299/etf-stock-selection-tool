@@ -53,7 +53,7 @@ const PALETTES: Record<ColorMode, Record<MarketDirection, DirectionPalette>> = {
 }
 
 export function getDirectionPalette(mode: ColorMode, direction: MarketDirection) {
-  return PALETTES[mode][direction]
+  return { ...PALETTES[mode][direction] }
 }
 
 export function numericToDirection(value: number): MarketDirection {
