@@ -1,15 +1,15 @@
 <template>
-  <section class="min-h-full bg-slate-50 p-4 md:p-6">
+  <section data-test="fund-shell" class="min-h-full bg-slate-50 p-4 md:p-6">
     <div class="flex w-full flex-col gap-4">
-      <div class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm md:p-5">
-        <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-          <div class="space-y-1">
+      <div data-test="fund-topbar" class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm md:p-5">
+        <div data-test="fund-topbar-flex" class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+          <div data-test="fund-topbar-left" class="space-y-1">
             <h1 class="text-2xl font-semibold tracking-tight text-slate-900">全量场内基金（不含货币/债券基金）</h1>
             <p class="text-sm text-slate-500">共监测{{ rows.length }}支</p>
           </div>
 
-          <div class="flex flex-col gap-3 md:flex-row md:items-center">
-            <div class="inline-flex rounded-xl bg-slate-100 p-1">
+          <div data-test="fund-topbar-right" class="flex flex-col gap-3 md:flex-row md:items-center lg:w-[380px] lg:flex-none">
+            <div data-test="fund-tab-group" class="inline-flex rounded-xl bg-slate-100 p-1">
               <button
                 data-test="mode-cn"
                 type="button"

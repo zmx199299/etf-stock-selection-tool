@@ -50,6 +50,29 @@ describe('FundList', () => {
     expect(wrapper.text()).not.toContain('支持代码和名称搜索')
   })
 
+  it('第二页顶部栏采用固定框架，右侧控制区宽度固定为统一基线', () => {
+    const wrapper = mount(FundList)
+
+    expect(wrapper.get('[data-test="fund-shell"]').classes()).toEqual(
+      expect.arrayContaining(['min-h-full', 'bg-slate-50', 'p-4', 'md:p-6']),
+    )
+    expect(wrapper.get('[data-test="fund-topbar"]').classes()).toEqual(
+      expect.arrayContaining(['rounded-2xl', 'border', 'border-slate-200', 'bg-white', 'p-4', 'md:p-5']),
+    )
+    expect(wrapper.get('[data-test="fund-topbar-flex"]').classes()).toEqual(
+      expect.arrayContaining(['flex', 'flex-col', 'gap-4', 'lg:flex-row', 'lg:items-center', 'lg:justify-between']),
+    )
+    expect(wrapper.get('[data-test="fund-topbar-left"]').classes()).toEqual(
+      expect.arrayContaining(['space-y-1']),
+    )
+    expect(wrapper.get('[data-test="fund-topbar-right"]').classes()).toEqual(
+      expect.arrayContaining(['flex', 'flex-col', 'gap-3', 'md:flex-row', 'md:items-center', 'lg:w-[380px]', 'lg:flex-none']),
+    )
+    expect(wrapper.get('[data-test="fund-tab-group"]').classes()).toEqual(
+      expect.arrayContaining(['inline-flex', 'rounded-xl', 'bg-slate-100', 'p-1']),
+    )
+  })
+
   it('切换到 intl 模式会同步更新 store 和 localStorage', async () => {
     const wrapper = mount(FundList)
     const colorModeStore = useColorModeStore()

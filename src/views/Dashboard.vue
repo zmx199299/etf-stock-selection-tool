@@ -1,27 +1,44 @@
 <template>
-  <div>
-    <header class="bg-white/90 backdrop-blur-md sticky top-0 md:top-6 z-40 mx-4 md:mx-8 mt-4 md:mt-6 p-6 rounded-[24px] border border-gray-100 shadow-sm flex flex-col lg:flex-row items-center justify-between gap-6">
-        <div class="flex items-center gap-8 w-full lg:w-auto">
-            <div class="flex flex-col">
-                <span class="text-[10px] text-gray-400 font-bold uppercase tracking-widest">今日监测</span>
-                <span class="text-lg font-black italic">{{ signals.length }} <span class="text-xs font-normal not-italic text-gray-300">支</span></span>
-            </div>
-            <div class="flex flex-col border-l pl-8 border-gray-100">
-                <span class="text-[10px] text-red-400 font-bold uppercase tracking-widest">符合规则</span>
-                <span class="text-lg font-black text-red-500 italic">{{ filteredSignals.length }}</span>
-            </div>
-        </div>
+  <section data-test="dashboard-shell" class="min-h-full bg-slate-50 p-4 md:p-6">
+    <div class="flex w-full flex-col gap-4">
+      <header
+        data-test="dashboard-topbar"
+        class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm md:p-5"
+      >
+        <div
+          data-test="dashboard-topbar-flex"
+          class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between"
+        >
+          <div data-test="dashboard-topbar-left" class="space-y-1">
+            <h1 class="text-2xl font-semibold tracking-tight text-slate-900">今日监测信号总览</h1>
+            <p class="text-sm text-slate-500">共监测{{ signals.length }}支，当前符合规则{{ filteredSignals.length }}支</p>
+          </div>
 
-        <div class="flex items-center bg-gray-100 p-1 rounded-xl w-full xl:w-auto">
-            <button @click="activeTab = 'all'" :class="activeTab === 'all' ? 'bg-white shadow-sm text-blue-600' : 'text-gray-400 hover:text-gray-600'" class="f-btn flex-1 xl:flex-none px-8 py-2 text-xs font-bold rounded-lg transition-all">全部</button>
-            <button @click="activeTab = 'T+0'" :class="activeTab === 'T+0' ? 'bg-white shadow-sm text-blue-600' : 'text-gray-400 hover:text-gray-600'" class="f-btn flex-1 xl:flex-none px-8 py-2 text-xs font-bold rounded-lg transition-all">T + 0</button>
-            <button @click="activeTab = 'T+1'" :class="activeTab === 'T+1' ? 'bg-white shadow-sm text-blue-600' : 'text-gray-400 hover:text-gray-600'" class="f-btn flex-1 xl:flex-none px-8 py-2 text-xs font-bold rounded-lg transition-all">T + 1</button>
-        </div>
-    </header>
+          <div
+            data-test="dashboard-topbar-right"
+            class="flex flex-col gap-3 md:flex-row md:items-center lg:w-[380px] lg:flex-none"
+          >
+            <div data-test="dashboard-tab-group" class="inline-flex rounded-xl bg-slate-100 p-1">
+              <button @click="activeTab = 'all'" :class="activeTab === 'all' ? 'bg-white shadow-sm text-slate-900' : 'text-slate-500 hover:text-slate-900'" class="f-btn rounded-lg px-3 py-2 text-sm font-medium transition">全部</button>
+              <button @click="activeTab = 'T+0'" :class="activeTab === 'T+0' ? 'bg-white shadow-sm text-slate-900' : 'text-slate-500 hover:text-slate-900'" class="f-btn rounded-lg px-3 py-2 text-sm font-medium transition">T+0</button>
+              <button @click="activeTab = 'T+1'" :class="activeTab === 'T+1' ? 'bg-white shadow-sm text-slate-900' : 'text-slate-500 hover:text-slate-900'" class="f-btn rounded-lg px-3 py-2 text-sm font-medium transition">T+1</button>
+            </div>
 
-    <div class="p-4 md:p-8 columns-1 md:columns-2 lg:columns-3 xl:columns-4 2xl:columns-6 gap-6 space-y-6">
+            <div
+              data-test="dashboard-control-slot"
+              aria-hidden="true"
+              class="hidden h-[42px] rounded-xl border border-transparent md:block md:w-64 lg:flex-1"
+            ></div>
+          </div>
+        </div>
+      </header>
+
+      <div
+        data-test="dashboard-card-grid"
+        class="grid gap-6 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-6"
+      >
         
-        <div v-for="signal in filteredSignals" :key="signal.code" @click="goToAnalysis(signal.code)" class="fund-card break-inside-avoid bg-white rounded-[32px] p-6 border border-gray-100 shadow-sm cursor-pointer relative group">
+        <div v-for="signal in filteredSignals" :key="signal.code" @click="goToAnalysis(signal.code)" class="fund-card bg-white rounded-[32px] p-6 border border-gray-100 shadow-sm cursor-pointer relative group h-full">
             <div :class="signal.t_plus === 'T+0' ? 'bg-blue-50 text-blue-500 border-blue-100' : 'bg-gray-50 text-gray-400 border-gray-100'" class="absolute top-5 right-5 px-2 py-0.5 text-[10px] font-bold rounded-md border">{{ signal.t_plus === 'T+0' ? 'T + 0' : 'T + 1' }}</div>
             <div class="pr-12 mb-5">
               <span class="text-base font-bold text-gray-900 block truncate">{{ signal.name }}</span>
@@ -48,7 +65,6 @@
             <div class="bg-gray-50/80 rounded-2xl p-4 space-y-2 mb-6 border border-gray-100/50">
                 <div class="flex justify-between text-xs text-gray-500 font-medium"><span>明日买入</span><span class="mono font-bold text-gray-900">{{ signal.buy_price ? signal.buy_price.toFixed(3) : '加载中' }}</span></div>
                 <div class="flex justify-between text-xs text-gray-500 font-medium"><span>建议卖出</span><span class="mono font-bold text-gray-900">{{ signal.sell_price ? signal.sell_price.toFixed(3) : '加载中' }}</span></div>
-                <div v-if="signal.stop_loss" class="flex justify-between text-xs pt-2 border-t border-gray-200/50"><span class="text-red-500 font-bold italic">止损点</span><span class="mono font-bold text-red-600">{{ signal.stop_loss.toFixed(3) }}</span></div>
             </div>
             
             <div class="h-1.5 w-full bg-gray-100 rounded-full flex overflow-hidden">
@@ -57,13 +73,14 @@
             </div>
         </div>
 
+      </div>
+
+      <!-- 空状态 -->
+      <div v-if="filteredSignals.length === 0" class="text-center py-20 text-gray-300 text-sm italic">
+        暂无交易信号
+      </div>
     </div>
-    
-    <!-- 空状态 -->
-    <div v-if="filteredSignals.length === 0" class="text-center py-20 text-gray-300 text-sm italic">
-      暂无交易信号
-    </div>
-  </div>
+  </section>
 </template>
 
 <script setup lang="ts">
