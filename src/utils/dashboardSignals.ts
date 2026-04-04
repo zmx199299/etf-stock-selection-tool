@@ -102,8 +102,8 @@ export async function loadSharedFundCards(): Promise<SharedFundCard[]> {
   }
 }
 
-export function getAnalysisEntryCards(routeCode?: string | null, sharedCards: SharedFundCard[] = getSharedFundCards()): SharedFundCard[] {
-  const defaultCards = sharedCards.slice(0, 10)
+export function getAnalysisEntryCards(routeCode?: string | null, sharedCards: SharedFundCard[] = getSharedFundCards(), count: number = 10): SharedFundCard[] {
+  const defaultCards = sharedCards.slice(0, count)
 
   if (!routeCode) {
     return defaultCards

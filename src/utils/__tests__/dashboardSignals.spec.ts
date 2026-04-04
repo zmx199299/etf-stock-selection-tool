@@ -129,6 +129,13 @@ describe('dashboardSignals', () => {
     expect(entryCodes).toEqual(getSharedFundCards().slice(0, 10).map((card) => card.code))
   })
 
+  it('分析页入口 getter 接受 count 参数控制返回数量', () => {
+    const entryCodes = getAnalysisEntryCards(null, undefined, 6).map((card) => card.code)
+
+    expect(entryCodes).toEqual(getSharedFundCards().slice(0, 6).map((card) => card.code))
+    expect(entryCodes).toHaveLength(6)
+  })
+
   it('分析页入口 getter 在带 route code 时返回空卡片集合，由详情页单独承接', () => {
     const entryCodes = getAnalysisEntryCards('510300').map((card) => card.code)
 
