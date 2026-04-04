@@ -60,7 +60,7 @@ def test_sync_daily_quotes(mock_env):
     pipeline.sync_fund_list()
     pipeline.sync_daily_quotes_for_all()
     quotes = mock_env["db"].get_daily_quotes("510300", "2026-03-01", "2026-03-28")
-    assert len(quotes) == 30
+    assert len(quotes) == 28
     assert quotes[-1]["close"] == pytest.approx(4.0 + 29 * 0.01 + 0.02, abs=0.001)
 
 

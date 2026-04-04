@@ -23,29 +23,30 @@ class MockDbWithData:
             {"code": "510300", "name": "沪深300ETF", "fund_type": "ETF", "invest_type": "指数型", "t_plus": "T+1", "list_date": "2012-05-28", "is_excluded": 0},
             {"code": "159915", "name": "创业板ETF", "fund_type": "ETF", "invest_type": "指数型", "t_plus": "T+1", "list_date": "2010-02-11", "is_excluded": 0},
         ])
-        # 插入日线数据（30天）
+        # 为两只基金都插入足够的日线数据，保证列表查询覆盖完整测试意图
         import numpy as np
         np.random.seed(42)
         n = 30
         dates = pd.date_range(end="2026-03-28", periods=n)
-        close = 4.0 + np.cumsum(np.random.randn(n) * 0.02)
-        high = close + np.abs(np.random.randn(n) * 0.03)
-        low = close - np.abs(np.random.randn(n) * 0.03)
-        opn = close + np.random.randn(n) * 0.01
-        volume = np.random.randint(100000, 500000, n).astype(float)
-        amount = volume * close
-
         quotes = []
-        for i in range(n):
-            quotes.append({
-                "code": "510300", "date": str(dates[i])[:10],
-                "open": float(opn[i]), "close": float(close[i]),
-                "high": float(high[i]), "low": float(low[i]),
-                "volume": float(volume[i]), "amount": float(amount[i]),
-                "nav": float(close[i]) - 0.005, "premium_rate": 0.001,
-                "prev_close": float(close[i-1]) if i > 0 else float(close[i]),
-                "is_suspended": 0, "suspended_days": 0,
-            })
+        for code, base in [("510300", 4.0), ("159915", 2.0)]:
+            close = base + np.cumsum(np.random.randn(n) * 0.02)
+            high = close + np.abs(np.random.randn(n) * 0.03)
+            low = close - np.abs(np.random.randn(n) * 0.03)
+            opn = close + np.random.randn(n) * 0.01
+            volume = np.random.randint(100000, 500000, n).astype(float)
+            amount = volume * close
+
+            for i in range(n):
+                quotes.append({
+                    "code": code, "date": str(dates[i])[:10],
+                    "open": float(opn[i]), "close": float(close[i]),
+                    "high": float(high[i]), "low": float(low[i]),
+                    "volume": float(volume[i]), "amount": float(amount[i]),
+                    "nav": float(close[i]) - 0.005, "premium_rate": 0.001,
+                    "prev_close": float(close[i-1]) if i > 0 else float(close[i]),
+                    "is_suspended": 0, "suspended_days": 0,
+                })
         self.db.upsert_daily_quotes(quotes)
 
     def get_all_active_funds(self):

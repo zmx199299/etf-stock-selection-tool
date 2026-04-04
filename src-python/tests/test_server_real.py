@@ -8,6 +8,7 @@ import pandas as pd
 import numpy as np
 from engine.models.database import Database
 from engine.server import create_real_server
+from engine.sync import DataSyncPipeline
 
 
 class MockAkshareSource:
@@ -44,6 +45,8 @@ def real_server(tmp_path):
     db = Database(db_path)
     db.init()
     source = MockAkshareSource()
+    pipeline = DataSyncPipeline(db, source)
+    pipeline.sync_all()
     server = create_real_server(db, source)
     yield server
     db.close()

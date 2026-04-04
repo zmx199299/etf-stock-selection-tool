@@ -87,8 +87,8 @@
 |---|---|---|---|---|---|
 | API-01 | `ping` | — | P2 | ✅ 已实现 | 未使用 |
 | API-02 | `get_engine_status` | — | P2 | ✅ 已实现（硬编码） | 未使用 |
-| API-03 | `get_dashboard_signals` | Dashboard, Analysis | **P0** | ⚠️ 硬编码 Mock | ✅ invoke 已写，有 Mock 回退 |
-| API-04 | `get_fund_list` | FundList | **P0** | ⚠️ 硬编码 Mock | ✅ invoke 已写，有 Mock 回退 |
+| API-03 | `get_dashboard_signals` | Dashboard, Analysis | **P0** | ✅ 已接真实数据 | ✅ invoke 已写，有 Mock 回退 |
+| API-04 | `get_fund_list` | FundList | **P0** | ✅ 已接真实数据 | ✅ invoke 已写，有 Mock 回退 |
 | API-05 | `get_fund_analysis` | Analysis | **P1** | ❌ 未实现 | ❌ 纯前端 Mock 查表 |
 | API-06 | `search_funds` | Analysis | **P1** | ❌ 未实现 | ❌ 纯前端 Mock 过滤 |
 | API-07 | `get_screening_results` | （未来筛选页） | P2 | ⚠️ 硬编码 Mock | 未使用 |
@@ -448,24 +448,24 @@ const result = await invoke('invoke_engine', {
 
 | 编号 | 问题 | 优先级 | 说明 |
 |---|---|---|---|
-| ISSUE-01 | FundList 缺少 snake_case → camelCase 转换层 | P0 | 后端返回 snake_case 后，`prev_close` 等字段会匹配不上前端的 `prevClose` |
+| ISSUE-01 | FundList 缺少 snake_case → camelCase 转换层 | P0 | 已解决：前端已补 `fundList.ts` 转换层 |
 | ISSUE-02 | Analysis 页面无 Tauri invoke 路径 | P1 | 需要新增 `get_fund_analysis` 调用 + Mock 回退 |
-| ISSUE-03 | server.py 业务方法全是硬编码 | P0 | 需要串联真实模块 |
-| ISSUE-04 | 缺少数据同步流程 | P0 | 需要先有数据入库，接口才能返回真实数据 |
-| ISSUE-05 | `get_dashboard_signals` 缺少 `change_pct` 字段 | P0 | 当前后端 Mock 没有返回此字段，前端需要 |
+| ISSUE-03 | server.py 业务方法全是硬编码 | P0 | 已部分解决：已新增 `create_real_server()` 串联真实模块，主入口后续继续收口 |
+| ISSUE-04 | 缺少数据同步流程 | P0 | 已解决：`DataSyncPipeline` 已实现 fund list / daily quotes / nav 同步 |
+| ISSUE-05 | `get_dashboard_signals` 缺少 `change_pct` 字段 | P0 | 已解决：真实信号构建中已计算并返回 `change_pct` |
 | ISSUE-06 | K线数据顺序约定 | P1 | 前端当前为 `[open, close, low, high]`，非标准 OHLC 顺序，需统一 |
 | ISSUE-07 | Scorer 评分逻辑过于简单 | P2 | 当前固定返回 60 分，需要根据真实指标数据计算 |
-| ISSUE-08 | 技术指标→文字描述的转换逻辑 | P1 | 后端需新增将数值指标转为"金叉/死叉/中轨"等文字的逻辑 |
+| ISSUE-08 | 技术指标→文字描述的转换逻辑 | P1 | 已部分解决：`FundService` 已实现 FundList 所需的 MACD/RSI/BOLL/MA5/MA20 文字化 |
 | ISSUE-09 | 分钟级数据源 | P2 | `intraday`/`m5`/`m60`/`m120` 周期需要分钟级行情数据，akshare 是否支持待确认 |
 
 ### 实施优先级建议
 
 ```
 第一步（P0 基础链路）：
-  ├─ 数据同步流程：akshare → SQLite（fund_info + daily_quote）
-  ├─ get_fund_list 接真实数据
-  ├─ get_dashboard_signals 接真实数据
-  └─ 前端 FundList 补 snake→camel 转换
+  ├─ 数据同步流程：akshare → SQLite（fund_info + daily_quote） ✅
+  ├─ get_fund_list 接真实数据 ✅
+  ├─ get_dashboard_signals 接真实数据 ✅
+  └─ 前端 FundList 补 snake→camel 转换 ✅
 
 第二步（P1 分析页）：
   ├─ 新增 get_fund_analysis 接口（先做日线周期）
@@ -486,3 +486,4 @@ const result = await invoke('invoke_engine', {
 | 日期 | 变更 |
 |---|---|
 | 2026-04-04 | 初始版本：梳理全部前端数据需求 + 后端已有能力，定义 6 个核心接口 |
+| 2026-04-04 | 更新 P0 状态：已实现 DataSyncPipeline、FundService、真实 `get_fund_list` / `get_dashboard_signals` 路径，并修复 Python 测试到 49 passed / 2 skipped |

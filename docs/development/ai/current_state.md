@@ -4,7 +4,7 @@
 
 ## 1. 当前阶段
 
-当前阶段为 **第四页系统设置页已完成，四页主体 Mock 框架全部就位**。
+当前阶段为 **P0 真实数据基础链路已打通，准备进入 P1 Analysis 接口开发**。
 
 ## 2. 当前已完成内容
 
@@ -38,7 +38,10 @@
 - `useColorModeStore()` — 全局红多/绿多配色管理，localStorage 持久化。
 - `useDisplaySettingsStore()` — 全局卡片数量设置管理，localStorage 持久化。
 - `dashboardSignals.ts` — 共享基金卡片数据源与加载器，`getAnalysisEntryCards()` 支持 `count` 参数。
-- 测试基线：11 个测试文件，112 个测试用例全部通过。
+- `DataSyncPipeline` — 后端数据同步管道，支持基金列表、日线行情、净值同步到 SQLite。
+- `FundService` — 后端业务层，支持基金列表、指标计算、FundList 所需的技术指标文字化与评分映射。
+- `create_real_server()` — 后端真实服务装配入口，已可返回真实 `get_fund_list` 与 `get_dashboard_signals` 数据。
+- 测试基线：前端 11 个测试文件，112 个测试用例全部通过；Python 端 49 个测试通过，2 个外部依赖测试按环境跳过。
 - TypeScript 类型检查 + Vite 构建通过。
 
 ## 3. 当前约束
@@ -50,7 +53,7 @@
 
 ## 4. 下一步
 
-- 四页主体 Mock 框架已全部就位，可进入真实数据联调阶段。
-- 优先考虑将 `loadSharedFundCards()` 替换为稳定后端返回。
-- 如需继续增强交互，可在 hover 浮层基础上补边界避让。
-- 评估 ECharts 集成时机，逐步替换 Mock 图表。
+- P0 已完成：数据同步、`get_fund_list`、`get_dashboard_signals`、FundList snake_case/camelCase 转换已落地。
+- 当前应进入 P1：定义并实现 `get_fund_analysis` 与 `search_funds` 两个核心接口。
+- Analysis 页当前仍是纯前端 Mock，需要补上 Tauri invoke 调用与真实后端回退链路。
+- `create_real_server()` 已就位，但 Python 主入口与 Rust 中间层的真实运行路径还需继续核对与收口。
