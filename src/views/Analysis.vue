@@ -384,6 +384,7 @@ import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
 import { useColorModeStore } from '../stores/colorMode'
+import { useDisplaySettingsStore } from '../stores/displaySettings'
 import {
   ANALYSIS_PERIOD_KEYS,
   getAnalysisMockByCode,
@@ -396,6 +397,7 @@ import { getDirectionPalette, numericToDirection, type MarketDirection } from '.
 const route = useRoute()
 const router = useRouter()
 const colorMode = useColorModeStore()
+const displaySettings = useDisplaySettingsStore()
 
 const keyword = ref('')
 const sharedCards = ref<SharedFundCard[]>([])
@@ -410,7 +412,7 @@ const routeCode = computed(() => {
 })
 
 const entryCards = computed<SharedFundCard[]>(() => {
-  return getAnalysisEntryCards(routeCode.value, sharedCards.value)
+  return getAnalysisEntryCards(routeCode.value, sharedCards.value, displaySettings.cardCount)
 })
 
 const activeCode = computed(() => routeCode.value)
@@ -674,6 +676,7 @@ watch(activePeriodKey, () => {
 })
 
 onMounted(async () => {
+  displaySettings.hydrate()
   sharedCards.value = await loadSharedFundCards()
 })
 </script>
