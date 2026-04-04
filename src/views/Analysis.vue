@@ -390,7 +390,7 @@ import {
   searchAnalysisCandidates,
   type AnalysisPeriodKey,
 } from '../utils/analysisMock'
-import { getAnalysisEntryCards, getSharedFundCards, loadSharedFundCards, type SharedFundCard } from '../utils/dashboardSignals'
+import { getAnalysisEntryCards, loadSharedFundCards, type SharedFundCard } from '../utils/dashboardSignals'
 import { getDirectionPalette, numericToDirection, type MarketDirection } from '../utils/marketColors'
 
 const route = useRoute()
@@ -398,7 +398,7 @@ const router = useRouter()
 const colorMode = useColorModeStore()
 
 const keyword = ref('')
-const sharedCards = ref<SharedFundCard[]>(getSharedFundCards())
+const sharedCards = ref<SharedFundCard[]>([])
 const activePeriodKey = ref<AnalysisPeriodKey>('day')
 const hoveredCandleIndex = ref<number | null>(null)
 const hoveredIntradayIndex = ref<number | null>(null)
@@ -418,7 +418,7 @@ const activeAnalysis = computed(() => (activeCode.value ? getAnalysisMockByCode(
 const candidates = computed(() => searchAnalysisCandidates(keyword.value))
 const activePeriod = computed(() => activeAnalysis.value?.periods[activePeriodKey.value] ?? null)
 const isIntradayChart = computed(() => activePeriodKey.value === 'intraday')
-const showEntryStrip = computed(() => !routeCode.value)
+const showEntryStrip = computed(() => !routeCode.value && entryCards.value.length > 0)
 const periodOptions = computed(() => {
   if (!activeAnalysis.value) {
     return []

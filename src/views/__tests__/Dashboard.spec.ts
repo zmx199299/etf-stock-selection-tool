@@ -201,6 +201,68 @@ describe('Dashboard', () => {
     vi.doUnmock('../../utils/dashboardSignals')
   })
 
+  it('首页首屏不会先回退到本地 getter，再被异步加载结果覆盖', async () => {
+    vi.resetModules()
+    vi.doMock('../../utils/dashboardSignals', async () => {
+      const actual = await vi.importActual<typeof import('../../utils/dashboardSignals')>(
+        '../../utils/dashboardSignals',
+      )
+
+      return {
+        ...actual,
+        getSharedFundCards: () => [
+          {
+            code: '500001',
+            name: '同步旧卡片',
+            tPlus: 'T+0',
+            currentPrice: 1,
+            changePct: 0,
+            buyPrice: null,
+            sellPrice: null,
+            stopLoss: null,
+            latestNav: 1,
+            navDate: '2026-03-30',
+            premiumRate: 0,
+            expectedProfit: null,
+            expectedProfitPct: null,
+            maxLoss: null,
+            maxLossPct: null,
+          },
+        ],
+        loadSharedFundCards: async () => [
+          {
+            code: '500002',
+            name: '异步新卡片',
+            tPlus: 'T+0',
+            currentPrice: 1,
+            changePct: 0,
+            buyPrice: null,
+            sellPrice: null,
+            stopLoss: null,
+            latestNav: 1,
+            navDate: '2026-03-30',
+            premiumRate: 0,
+            expectedProfit: null,
+            expectedProfitPct: null,
+            maxLoss: null,
+            maxLossPct: null,
+          },
+        ],
+      }
+    })
+
+    const { default: AsyncDashboard } = await import('../Dashboard.vue')
+    const wrapper = mount(AsyncDashboard)
+
+    expect(wrapper.text()).not.toContain('同步旧卡片')
+
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('异步新卡片')
+
+    vi.doUnmock('../../utils/dashboardSignals')
+  })
+
   it('首页面对缺失卡片字段时仍使用安全文案渲染', async () => {
     vi.resetModules()
     vi.doMock('../../utils/dashboardSignals', async () => {

@@ -116,9 +116,11 @@ describe('Analysis', () => {
     expect(wrapper.get('[data-test="analysis-metric-value-MACD"]').text()).toContain('金叉')
   })
 
-  it('直接点击第三页时顶部显示承接自第一页的基金卡片，而不是固定示例按钮', () => {
+  it('直接点击第三页时顶部显示承接自第一页的基金卡片，而不是固定示例按钮', async () => {
     routeState.query = {}
     const wrapper = mount(Analysis)
+
+    await flushPromises()
 
     const entryStrip = wrapper.get('[data-test="analysis-entry-strip"]')
     const entryButtons = wrapper.findAll('[data-test^="analysis-entry-card-"]')
@@ -179,9 +181,75 @@ describe('Analysis', () => {
     vi.doUnmock('../../utils/dashboardSignals')
   })
 
-  it('路由未带 code 时保留顶部横栏与卡片页，但不显示详情主体', () => {
+  it('无参卡片页首屏不会先显示本地 getter 卡片，再被同源加载结果覆盖', async () => {
+    routeState.query = {}
+    vi.resetModules()
+    vi.doMock('../../utils/dashboardSignals', async () => {
+      const actual = await vi.importActual<typeof import('../../utils/dashboardSignals')>(
+        '../../utils/dashboardSignals',
+      )
+
+      return {
+        ...actual,
+        getSharedFundCards: () => [
+          {
+            code: '699998',
+            name: '旧入口卡片',
+            tPlus: 'T+0',
+            currentPrice: 1,
+            changePct: 0,
+            buyPrice: null,
+            sellPrice: null,
+            stopLoss: null,
+            latestNav: 1,
+            navDate: '2026-03-30',
+            premiumRate: 0,
+            expectedProfit: null,
+            expectedProfitPct: null,
+            maxLoss: null,
+            maxLossPct: null,
+          },
+        ],
+        loadSharedFundCards: async () => [
+          {
+            code: '699997',
+            name: '新入口卡片',
+            tPlus: 'T+0',
+            currentPrice: 1,
+            changePct: 0,
+            buyPrice: null,
+            sellPrice: null,
+            stopLoss: null,
+            latestNav: 1,
+            navDate: '2026-03-30',
+            premiumRate: 0,
+            expectedProfit: null,
+            expectedProfitPct: null,
+            maxLoss: null,
+            maxLossPct: null,
+          },
+        ],
+        getAnalysisEntryCards: (routeCode?: string | null, sharedCards = []) => actual.getAnalysisEntryCards(routeCode, sharedCards),
+      }
+    })
+
+    const { default: AsyncAnalysis } = await import('../Analysis.vue')
+    const wrapper = mount(AsyncAnalysis)
+
+    expect(wrapper.text()).not.toContain('旧入口卡片')
+
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('新入口卡片')
+
+    vi.doUnmock('../../utils/dashboardSignals')
+  })
+
+  it('路由未带 code 时保留顶部横栏与卡片页，但不显示详情主体', async () => {
     routeState.query = {}
     const wrapper = mount(Analysis)
+
+    await flushPromises()
 
     expect(wrapper.find('[data-test="analysis-topbar"]').exists()).toBe(true)
     expect(wrapper.find('[data-test="analysis-entry-strip"]').exists()).toBe(true)
@@ -194,6 +262,8 @@ describe('Analysis', () => {
   it('点击顶部基金卡片后进入纯详情页并重置周期为 day', async () => {
     routeState.query = {}
     const wrapper = mount(Analysis)
+
+    await flushPromises()
 
     await wrapper.get('[data-test="analysis-entry-card-159915"]').trigger('click')
 
@@ -220,6 +290,8 @@ describe('Analysis', () => {
   it('点击默认顶部卡片中的共享基金后会进入对应分析态，而不是回到空态', async () => {
     routeState.query = {}
     const wrapper = mount(Analysis)
+
+    await flushPromises()
 
     await wrapper.get('[data-test="analysis-entry-card-513130"]').trigger('click')
 
@@ -503,6 +575,8 @@ describe('Analysis', () => {
   it('切换基金时会立即清空当前 hover 浮层', async () => {
     routeState.query = {}
     const wrapper = mount(Analysis)
+
+    await flushPromises()
 
     await wrapper.get('[data-test="analysis-entry-card-513130"]').trigger('click')
 

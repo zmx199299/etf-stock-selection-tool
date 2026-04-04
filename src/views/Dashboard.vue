@@ -89,7 +89,6 @@ import { useRouter } from 'vue-router'
 
 import { useColorModeStore } from '../stores/colorMode'
 import {
-  getSharedFundCards,
   loadSharedFundCards,
   type SharedFundCard,
 } from '../utils/dashboardSignals'
@@ -98,7 +97,7 @@ import { getDirectionPalette, numericToDirection } from '../utils/marketColors'
 const router = useRouter()
 const colorMode = useColorModeStore()
 
-const signals = ref<SharedFundCard[]>(getSharedFundCards().slice(0, 10))
+const signals = ref<SharedFundCard[]>([])
 const activeTab = ref<'all' | 'T+0' | 'T+1'>('all')
 
 const filteredSignals = computed(() => {
