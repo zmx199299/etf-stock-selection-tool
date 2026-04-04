@@ -275,3 +275,92 @@ class JSONRPCServer:
             response = self.handle_request(line)
             sys.stdout.write(response + "\n")
             sys.stdout.flush()
+
+
+def create_real_server(db, source):
+    """创建使用真实模块的 JSONRPCServer"""
+    import pandas as pd
+    from engine.services.fund_service import FundService
+    from engine.scoring.indicators import TechnicalIndicators
+    from engine.scoring.scorer import Scorer
+    from engine.sync import DataSyncPipeline
+    
+    server = JSONRPCServer()
+
+    # 初始化组件
+    indicators = TechnicalIndicators()
+    scorer = Scorer()
+    fund_service = FundService(db, indicators, scorer)
+    sync_pipeline = DataSyncPipeline(db, source)
+
+    # 注册方法
+    server.register_method("ping", lambda: "pong")
+    server.register_method("get_engine_status", lambda: {"status": "running", "version": "1.0.0"})
+    server.register_method("fetch_legal_tax_rates", fetch_legal_tax_rates)
+
+    # 使用真实 service 层
+    server.register_method("get_fund_list", fund_service.get_fund_list)
+
+    def get_dashboard_signals_real():
+        return _build_dashboard_signals(db, fund_service)
+
+    server.register_method("get_dashboard_signals", get_dashboard_signals_real)
+
+    def sync_data():
+        return sync_pipeline.sync_all()
+
+    server.register_method("sync_data", sync_data)
+
+    return server
+
+
+def _build_dashboard_signals(db, fund_service):
+    """从数据库构建 dashboard signals"""
+    import pandas as pd
+    funds = db.get_all_active_funds()
+    if not funds:
+        return []
+
+    signals = []
+    for fund in funds:
+        code = fund["code"]
+        quotes = db.get_daily_quotes(code, "2000-01-01", "2099-12-31")
+        if not quotes:
+            continue
+
+        df = pd.DataFrame(quotes)
+        for col in ["open", "close", "high", "low", "volume", "amount"]:
+            if col in df.columns:
+                df[col] = pd.to_numeric(df[col], errors="coerce")
+        df = df.sort_values("date").reset_index(drop=True)
+
+        latest = df.iloc[-1]
+        prev = df.iloc[-2] if len(df) > 1 else latest
+
+        current_price = float(latest["close"])
+        prev_close = float(prev["close"])
+        change_pct = round((current_price - prev_close) / prev_close * 100, 2) if prev_close != 0 else 0.0
+
+        nav = float(latest.get("nav", 0)) if pd.notna(latest.get("nav")) else None
+        nav_date = latest.get("date") if "date" in df.columns else None
+        premium_rate = round(float(latest.get("premium_rate", 0)) * 100, 2) if pd.notna(latest.get("premium_rate")) else None
+
+        signals.append({
+            "code": code,
+            "name": fund["name"],
+            "t_plus": fund["t_plus"],
+            "current_price": round(current_price, 3),
+            "change_pct": change_pct,
+            "buy_price": None,
+            "sell_price": None,
+            "stop_loss": None,
+            "latest_nav": round(nav, 3) if nav else None,
+            "nav_date": nav_date,
+            "premium_rate": premium_rate,
+            "expected_profit": None,
+            "expected_profit_pct": None,
+            "max_loss": None,
+            "max_loss_pct": None,
+        })
+
+    return signals
