@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import Dashboard from '../Dashboard.vue'
 import { useColorModeStore } from '../../stores/colorMode'
+import { useDisplaySettingsStore } from '../../stores/displaySettings'
 import { getSharedFundCards } from '../../utils/dashboardSignals'
 
 const pushMock = vi.fn()
@@ -341,5 +342,16 @@ describe('Dashboard', () => {
     expect(wrapper.text()).toContain('加载中')
 
     vi.doUnmock('../../utils/dashboardSignals')
+  })
+
+  it('首页从 displaySettings store 读取 cardCount 控制展示数量', async () => {
+    const displaySettings = useDisplaySettingsStore()
+    displaySettings.setCardCount(6)
+
+    const wrapper = mount(Dashboard)
+
+    await flushPromises()
+
+    expect(wrapper.findAll('.fund-card')).toHaveLength(6)
   })
 })

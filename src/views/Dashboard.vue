@@ -88,6 +88,7 @@ import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 
 import { useColorModeStore } from '../stores/colorMode'
+import { useDisplaySettingsStore } from '../stores/displaySettings'
 import {
   loadSharedFundCards,
   type SharedFundCard,
@@ -96,6 +97,7 @@ import { getDirectionPalette, numericToDirection } from '../utils/marketColors'
 
 const router = useRouter()
 const colorMode = useColorModeStore()
+const displaySettings = useDisplaySettingsStore()
 
 const signals = ref<SharedFundCard[]>([])
 const activeTab = ref<'all' | 'T+0' | 'T+1'>('all')
@@ -145,10 +147,11 @@ function goToAnalysis(code: string) {
 }
 
 async function fetchSignals() {
-  signals.value = (await loadSharedFundCards()).slice(0, 10)
+  signals.value = (await loadSharedFundCards()).slice(0, displaySettings.cardCount)
 }
 
 onMounted(() => {
+  displaySettings.hydrate()
   fetchSignals()
 })
 </script>
