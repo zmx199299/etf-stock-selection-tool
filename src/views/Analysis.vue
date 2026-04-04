@@ -59,29 +59,37 @@
         </div>
       </header>
 
+      <section
+        v-if="showEntryStrip"
+        data-test="analysis-entry-strip"
+        class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"
+      >
+        <div class="flex flex-wrap gap-3">
+          <button
+            v-for="card in entryCards"
+            :key="card.code"
+            :data-test="`analysis-entry-card-${card.code}`"
+            type="button"
+            class="min-w-[160px] flex-1 rounded-2xl border px-4 py-3 text-left transition md:max-w-[220px]"
+            :class="activeCode === card.code ? 'border-slate-900 bg-slate-900 text-white shadow-sm' : 'border-slate-200 bg-slate-50 text-slate-900 hover:border-slate-300 hover:bg-white'"
+            @click="selectCode(card.code)"
+          >
+            <div class="text-sm font-semibold">{{ card.name }}</div>
+            <div class="mt-1 text-xs" :class="activeCode === card.code ? 'text-slate-200' : 'text-slate-500'">{{ card.code }}</div>
+          </button>
+        </div>
+      </section>
+
       <div
         v-if="!activeAnalysis"
         data-test="analysis-empty-state"
         class="rounded-2xl border border-dashed border-slate-300 bg-white p-10 text-center shadow-sm"
       >
         <h2 class="text-xl font-semibold text-slate-900">请选择基金</h2>
-        <p class="mt-2 text-sm text-slate-500">第三页支持从列表页带代码进入，也支持在页内搜索后查看示例分析。</p>
+        <p class="mt-2 text-sm text-slate-500">请从顶部卡片或搜索选择基金，再查看对应的技术分析内容。</p>
         <p v-if="keyword.trim() && candidates.length === 0" data-test="analysis-empty-hint" class="mt-3 text-sm text-slate-400">
           未找到匹配基金，请更换代码或名称关键字。
         </p>
-        <div v-if="!keyword.trim()" class="mt-6 grid gap-3 md:grid-cols-2">
-          <button
-            v-for="candidate in candidates"
-            :key="candidate.code"
-            :data-test="`analysis-pick-${candidate.code}`"
-            type="button"
-            class="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-left transition hover:border-slate-300 hover:bg-white"
-            @click="selectCode(candidate.code)"
-          >
-            <div class="font-medium text-slate-900">{{ candidate.name }}</div>
-            <div class="text-sm text-slate-500">{{ candidate.code }}</div>
-          </button>
-        </div>
       </div>
 
       <template v-else>
@@ -202,12 +210,16 @@
                     </div>
 
                     <div>
-                      <div class="relative h-40 rounded-lg bg-[linear-gradient(180deg,#f8fafc_0%,#ffffff_100%)] px-2 pb-3 pt-3">
+                      <div
+                        data-test="analysis-chart-hit-area"
+                        class="relative h-40 rounded-lg bg-[linear-gradient(180deg,#f8fafc_0%,#ffffff_100%)] px-2 pb-3 pt-3"
+                        @mouseleave="hideCandleTooltip"
+                      >
                         <div class="absolute inset-x-2 inset-y-3 flex flex-col justify-between">
                           <div v-for="price in activePeriod?.priceAxis ?? []" :key="`grid-${price}`" class="border-t border-dashed border-slate-200"></div>
                         </div>
 
-                        <div v-if="isIntradayChart" class="relative z-10 flex h-full items-end gap-2">
+                        <div v-if="isIntradayChart" class="relative z-10 h-full">
                           <svg class="h-full w-full" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
                             <polyline
                               data-test="analysis-intraday-line"
@@ -229,6 +241,15 @@
                               :points="intradayAvgLinePath"
                             />
                           </svg>
+                          <div class="absolute inset-0 z-20 flex">
+                            <div
+                              v-for="(_, index) in intradayTooltipPoints"
+                              :key="`intraday-hitbox-${index}`"
+                              :data-test="`analysis-intraday-hitbox-${index}`"
+                              class="h-full w-full cursor-pointer bg-transparent"
+                              @mouseenter="showIntradayTooltip(index, $event)"
+                            ></div>
+                          </div>
                         </div>
 
                         <div v-else class="relative z-10 flex h-full items-end gap-2">
@@ -238,6 +259,11 @@
                             data-test="analysis-chart-candle"
                             class="relative flex w-full items-end justify-center"
                           >
+                            <div
+                              :data-test="`analysis-chart-candle-hitbox-${index}`"
+                              class="absolute inset-0 z-20 cursor-pointer bg-transparent"
+                              @mouseenter="showCandleTooltip(index, $event)"
+                            ></div>
                             <div
                               :data-test="`analysis-chart-candle-${index}-line`"
                               class="absolute bottom-2 w-px bg-slate-300"
@@ -250,6 +276,26 @@
                               :style="{ height: `${candle.bodyHeight}px` }"
                             ></div>
                           </div>
+                        </div>
+
+                        <div
+                          v-if="hoveredTooltip"
+                          data-test="analysis-chart-tooltip"
+                          class="pointer-events-none absolute z-30 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-slate-700 shadow-lg"
+                          :style="tooltipStyle"
+                        >
+                          <template v-if="hoveredTooltip.type === 'candle'">
+                            <div>日期：{{ hoveredTooltip.label }}</div>
+                            <div>开盘：{{ formatTooltipPrice(hoveredTooltip.open) }}</div>
+                            <div>收盘：{{ formatTooltipPrice(hoveredTooltip.close) }}</div>
+                            <div>最高：{{ formatTooltipPrice(hoveredTooltip.high) }}</div>
+                            <div>最低：{{ formatTooltipPrice(hoveredTooltip.low) }}</div>
+                          </template>
+                          <template v-else>
+                            <div>时间：{{ hoveredTooltip.label }}</div>
+                            <div>价格：{{ formatTooltipPrice(hoveredTooltip.price) }}</div>
+                            <div>均价：{{ formatTooltipPrice(hoveredTooltip.average) }}</div>
+                          </template>
                         </div>
                       </div>
 
@@ -334,8 +380,8 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
-import { useRoute } from 'vue-router'
+import { computed, onMounted, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 
 import { useColorModeStore } from '../stores/colorMode'
 import {
@@ -344,25 +390,35 @@ import {
   searchAnalysisCandidates,
   type AnalysisPeriodKey,
 } from '../utils/analysisMock'
+import { getAnalysisEntryCards, getSharedFundCards, loadSharedFundCards, type SharedFundCard } from '../utils/dashboardSignals'
 import { getDirectionPalette, numericToDirection, type MarketDirection } from '../utils/marketColors'
 
 const route = useRoute()
+const router = useRouter()
 const colorMode = useColorModeStore()
 
 const keyword = ref('')
-const selectedCode = ref<string | null>(null)
+const sharedCards = ref<SharedFundCard[]>(getSharedFundCards())
 const activePeriodKey = ref<AnalysisPeriodKey>('day')
+const hoveredCandleIndex = ref<number | null>(null)
+const hoveredIntradayIndex = ref<number | null>(null)
+const tooltipPosition = ref({ left: 0, top: 0 })
 
 const routeCode = computed(() => {
   const raw = route.query.code
   return typeof raw === 'string' && raw ? raw : null
 })
 
-const activeCode = computed(() => selectedCode.value ?? routeCode.value)
+const entryCards = computed<SharedFundCard[]>(() => {
+  return getAnalysisEntryCards(routeCode.value, sharedCards.value)
+})
+
+const activeCode = computed(() => routeCode.value)
 const activeAnalysis = computed(() => (activeCode.value ? getAnalysisMockByCode(activeCode.value) : null))
 const candidates = computed(() => searchAnalysisCandidates(keyword.value))
 const activePeriod = computed(() => activeAnalysis.value?.periods[activePeriodKey.value] ?? null)
 const isIntradayChart = computed(() => activePeriodKey.value === 'intraday')
+const showEntryStrip = computed(() => !routeCode.value)
 const periodOptions = computed(() => {
   if (!activeAnalysis.value) {
     return []
@@ -417,19 +473,70 @@ const chartCandles = computed(() => {
   const maxBodyHeight = 104
 
   return Array.from({ length: 12 }, (_, index) => {
-    const [open, close, low, high] = baseCandles[index % baseCandles.length] ?? [0, 0, 0, 0]
-    const priceRange = Math.max(high - low, 0.01)
-    const bodyRange = Math.max(Math.abs(close - open), priceRange * 0.35)
-    const lineHeight = Math.max(Math.round((priceRange / totalRange) * maxLineHeight), 28)
-    const bodyHeight = Math.min(Math.max(Math.round((bodyRange / totalRange) * maxBodyHeight), 18), lineHeight)
+     const [open, close, low, high] = baseCandles[index % baseCandles.length] ?? [0, 0, 0, 0]
+      const label = activePeriod.value?.timeAxis[index % (activePeriod.value?.timeAxis.length || 1)] ?? ''
+      const priceRange = Math.max(high - low, 0.01)
+      const bodyRange = Math.max(Math.abs(close - open), priceRange * 0.35)
+      const lineHeight = Math.max(Math.round((priceRange / totalRange) * maxLineHeight), 28)
+      const bodyHeight = Math.min(Math.max(Math.round((bodyRange / totalRange) * maxBodyHeight), 18), lineHeight)
 
-    return {
-      direction: close >= open ? ('bullish' as const) : ('bearish' as const),
-      lineHeight,
-      bodyHeight,
-    }
-  })
+      return {
+        label,
+        open,
+        close,
+        low,
+        high,
+        direction: close >= open ? ('bullish' as const) : ('bearish' as const),
+        lineHeight,
+        bodyHeight,
+      }
+    })
 })
+
+const hoveredCandle = computed(() => {
+  if (isIntradayChart.value || hoveredCandleIndex.value === null) {
+    return null
+  }
+
+  return chartCandles.value[hoveredCandleIndex.value] ?? null
+})
+
+const intradayTooltipPoints = computed(() => activePeriod.value?.linePoints ?? [])
+
+const hoveredIntradayPoint = computed(() => {
+  if (!isIntradayChart.value || hoveredIntradayIndex.value === null || !activePeriod.value) {
+    return null
+  }
+
+  return {
+    label: activePeriod.value.timeAxis[hoveredIntradayIndex.value] ?? '',
+    price: activePeriod.value.linePoints[hoveredIntradayIndex.value] ?? 0,
+    average: activePeriod.value.avgLinePoints[hoveredIntradayIndex.value] ?? 0,
+  }
+})
+
+const hoveredTooltip = computed(() => {
+  if (hoveredCandle.value) {
+    return {
+      type: 'candle' as const,
+      ...hoveredCandle.value,
+    }
+  }
+
+  if (hoveredIntradayPoint.value) {
+    return {
+      type: 'intraday' as const,
+      ...hoveredIntradayPoint.value,
+    }
+  }
+
+  return null
+})
+
+const tooltipStyle = computed(() => ({
+  left: `${tooltipPosition.value.left}px`,
+  top: `${tooltipPosition.value.top}px`,
+}))
 
 const chartVolumes = computed(() => {
   const baseVolumes = activePeriod.value?.volumes ?? []
@@ -463,9 +570,13 @@ const headerDescription = computed(() => {
 })
 
 function selectCode(code: string) {
-  selectedCode.value = code
+  hideCandleTooltip()
   keyword.value = ''
   activePeriodKey.value = 'day'
+  void router.push({
+    name: 'analysis',
+    query: { code },
+  })
 }
 
 function getCandlePalette(direction: MarketDirection) {
@@ -492,6 +603,42 @@ function getPeriodDisplayLabel(key: AnalysisPeriodKey, fallbackLabel?: string) {
   return labelMap[key] ?? fallbackLabel ?? 'K 线'
 }
 
+function showCandleTooltip(index: number, event: MouseEvent) {
+  hoveredCandleIndex.value = index
+  hoveredIntradayIndex.value = null
+  updateTooltipPosition(event)
+}
+
+function showIntradayTooltip(index: number, event: MouseEvent) {
+  hoveredIntradayIndex.value = index
+  hoveredCandleIndex.value = null
+  updateTooltipPosition(event)
+}
+
+function updateTooltipPosition(event: MouseEvent) {
+  const currentTarget = event.currentTarget instanceof HTMLElement ? event.currentTarget : null
+  const host = currentTarget?.closest('[data-test="analysis-chart-hit-area"]')
+
+  if (!(host instanceof HTMLElement)) {
+    return
+  }
+
+  const rect = host.getBoundingClientRect()
+  tooltipPosition.value = {
+    left: Math.max(event.clientX - rect.left + 12, 12),
+    top: Math.max(event.clientY - rect.top + 12, 12),
+  }
+}
+
+function hideCandleTooltip() {
+  hoveredCandleIndex.value = null
+  hoveredIntradayIndex.value = null
+}
+
+function formatTooltipPrice(value: number) {
+  return value.toFixed(3)
+}
+
 function buildLinePath(points: number[]) {
   if (points.length === 0) {
     return ''
@@ -511,14 +658,22 @@ function buildLinePath(points: number[]) {
 }
 
 watch(routeCode, (code) => {
+  hideCandleTooltip()
   activePeriodKey.value = 'day'
 
   if (code) {
-    selectedCode.value = null
     keyword.value = ''
     return
   }
 
-  selectedCode.value = null
+  keyword.value = ''
+})
+
+watch(activePeriodKey, () => {
+  hideCandleTooltip()
+})
+
+onMounted(async () => {
+  sharedCards.value = await loadSharedFundCards()
 })
 </script>

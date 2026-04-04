@@ -114,6 +114,17 @@ describe('FundList', () => {
     })
   })
 
+  it('详情分析跳转会携带 code 查询参数，供第三页直接进入详情态', async () => {
+    const wrapper = mount(FundList)
+
+    await wrapper.get('[data-test="detail-159915"]').trigger('click')
+
+    expect(pushMock).toHaveBeenCalledWith({
+      name: 'analysis',
+      query: { code: '159915' },
+    })
+  })
+
   it('搜索无结果时显示空状态文案', async () => {
     const wrapper = mount(FundList)
 

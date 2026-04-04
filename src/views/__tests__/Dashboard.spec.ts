@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import Dashboard from '../Dashboard.vue'
 import { useColorModeStore } from '../../stores/colorMode'
+import { getSharedFundCards } from '../../utils/dashboardSignals'
 
 const pushMock = vi.fn()
 
@@ -99,5 +100,184 @@ describe('Dashboard', () => {
     expect(wrapper.get('[data-test="dashboard-card-grid"]').classes()).not.toEqual(
       expect.arrayContaining(['columns-1', 'md:columns-2', 'lg:columns-3']),
     )
+  })
+
+  it('首页仍渲染共享基金卡片数据中的已知代码和名称', async () => {
+    const wrapper = mount(Dashboard)
+    const [firstSignal] = getSharedFundCards()
+
+    await flushPromises()
+
+    expect(wrapper.text()).toContain(firstSignal.name)
+    expect(wrapper.text()).toContain(`${firstSignal.code}.SH`)
+  })
+
+  it('首页仍只展示默认 10 张卡片，不把额外详情入口基金带到首页', async () => {
+    const wrapper = mount(Dashboard)
+
+    await flushPromises()
+
+    expect(wrapper.findAll('.fund-card')).toHaveLength(10)
+    expect(wrapper.text()).not.toContain('沪深300ETF')
+  })
+
+  it('首页通过共享加载器读取基金卡片数据', async () => {
+    vi.resetModules()
+    vi.doMock('../../utils/dashboardSignals', async () => {
+      const actual = await vi.importActual<typeof import('../../utils/dashboardSignals')>(
+        '../../utils/dashboardSignals',
+      )
+
+        return {
+          ...actual,
+          loadSharedFundCards: async () => [
+            {
+              code: '599999',
+              name: '哨兵基金',
+              tPlus: 'T+0',
+              currentPrice: 1.234,
+              changePct: 0.66,
+              buyPrice: null,
+              sellPrice: null,
+              stopLoss: null,
+              latestNav: 1.233,
+              navDate: '2026-03-30',
+              premiumRate: 0.11,
+              expectedProfit: null,
+              expectedProfitPct: null,
+              maxLoss: null,
+              maxLossPct: null,
+            },
+          ],
+          toSharedFundCards: () => [
+            {
+              code: '599999',
+              name: '哨兵基金',
+            tPlus: 'T+0',
+            currentPrice: 1.234,
+            changePct: 0.66,
+            buyPrice: null,
+            sellPrice: null,
+            stopLoss: null,
+            latestNav: 1.233,
+            navDate: '2026-03-30',
+            premiumRate: 0.11,
+            expectedProfit: null,
+            expectedProfitPct: null,
+            maxLoss: null,
+            maxLossPct: null,
+          },
+        ],
+        getSharedFundCards: () => [
+          {
+            code: '599999',
+            name: '哨兵基金',
+            tPlus: 'T+0',
+            currentPrice: 1.234,
+            changePct: 0.66,
+            buyPrice: null,
+            sellPrice: null,
+            stopLoss: null,
+            latestNav: 1.233,
+            navDate: '2026-03-30',
+            premiumRate: 0.11,
+            expectedProfit: null,
+            expectedProfitPct: null,
+            maxLoss: null,
+            maxLossPct: null,
+          },
+        ],
+      }
+    })
+
+    const { default: SharedDashboard } = await import('../Dashboard.vue')
+    const wrapper = mount(SharedDashboard)
+
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('哨兵基金')
+    expect(wrapper.text()).toContain('599999.SH')
+
+    vi.doUnmock('../../utils/dashboardSignals')
+  })
+
+  it('首页面对缺失卡片字段时仍使用安全文案渲染', async () => {
+    vi.resetModules()
+    vi.doMock('../../utils/dashboardSignals', async () => {
+      const actual = await vi.importActual<typeof import('../../utils/dashboardSignals')>(
+        '../../utils/dashboardSignals',
+      )
+
+      return {
+        ...actual,
+        loadSharedFundCards: async () => [
+          {
+            code: '511111',
+            name: '缺失值基金',
+            tPlus: 'T+1',
+            currentPrice: 1.2,
+            changePct: 0,
+            buyPrice: null,
+            sellPrice: null,
+            stopLoss: null,
+            latestNav: null,
+            navDate: null,
+            premiumRate: null,
+            expectedProfit: null,
+            expectedProfitPct: null,
+            maxLoss: null,
+            maxLossPct: null,
+          },
+        ],
+        toSharedFundCards: () => [
+          {
+            code: '511111',
+            name: '缺失值基金',
+            tPlus: 'T+1',
+            currentPrice: 1.2,
+            changePct: 0,
+            buyPrice: null,
+            sellPrice: null,
+            stopLoss: null,
+            latestNav: null,
+            navDate: null,
+            premiumRate: null,
+            expectedProfit: null,
+            expectedProfitPct: null,
+            maxLoss: null,
+            maxLossPct: null,
+          },
+        ],
+        getSharedFundCards: () => [
+          {
+            code: '511111',
+            name: '缺失值基金',
+            tPlus: 'T+1',
+            currentPrice: 1.2,
+            changePct: 0,
+            buyPrice: null,
+            sellPrice: null,
+            stopLoss: null,
+            latestNav: null,
+            navDate: null,
+            premiumRate: null,
+            expectedProfit: null,
+            expectedProfitPct: null,
+            maxLoss: null,
+            maxLossPct: null,
+          },
+        ],
+      }
+    })
+
+    const { default: SafeDashboard } = await import('../Dashboard.vue')
+    const wrapper = mount(SafeDashboard)
+
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('缺失值基金')
+    expect(wrapper.text()).toContain('加载中')
+
+    vi.doUnmock('../../utils/dashboardSignals')
   })
 })

@@ -8,6 +8,7 @@ import {
   getDefaultAnalysisMock,
   searchAnalysisCandidates,
 } from '../analysisMock'
+import { getSharedFundCards } from '../dashboardSignals'
 
 const KLINE_PERIOD_KEYS: AnalysisPeriodKey[] = ['day', 'm5', 'm60', 'm120', 'week', 'month', 'quarter', 'year']
 
@@ -26,7 +27,7 @@ describe('analysisMock', () => {
   it('每只基金都包含完整的 9 个分析周期', () => {
     const results = searchAnalysisCandidates('')
 
-    expect(results).toHaveLength(2)
+    expect(results).toHaveLength(13)
 
     results.forEach((item: AnalysisMock) => {
       expect(Object.keys(item.periods)).toEqual(ANALYSIS_PERIOD_KEYS)
@@ -99,16 +100,19 @@ describe('analysisMock', () => {
   it('搜索候选支持代码和名称关键字匹配', () => {
     const byCode = searchAnalysisCandidates('159915')
     const byName = searchAnalysisCandidates('创业板')
+    const sharedEntryCode = searchAnalysisCandidates('513130')
 
     expect(byCode).toHaveLength(1)
     expect(byCode[0].code).toBe('159915')
     expect(byName[0].name).toContain('创业板')
+    expect(sharedEntryCode).toHaveLength(1)
+    expect(sharedEntryCode[0].code).toBe('513130')
   })
 
   it('搜索候选会忽略前后空格与大小写差异', () => {
     const result = searchAnalysisCandidates('  etf  ')
 
-    expect(result).toHaveLength(2)
+    expect(result.length).toBeGreaterThanOrEqual(10)
   })
 
   it('返回的 Mock 数据不会污染源数据', () => {
@@ -161,5 +165,21 @@ describe('analysisMock', () => {
     expect(second.periods.day.timeAxis[0]).toBe('04-08')
     expect(second.periods.day.avgLinePoints[0]).toBe(4.03)
     expect(second.periods.day.volumes[1]).toBe(790000)
+  })
+
+  it('第三页默认顶部入口卡片都能命中对应分析 mock', () => {
+    const entryCodes = getSharedFundCards()
+      .slice(0, 10)
+      .map((card) => card.code)
+
+    entryCodes.forEach((code) => {
+      expect(getAnalysisMockByCode(code)?.code).toBe(code)
+    })
+  })
+
+  it('第二页详情入口里的基金都能命中对应分析 mock', () => {
+    ;['510300', '159915', '510500', '588000'].forEach((code) => {
+      expect(getAnalysisMockByCode(code)?.code).toBe(code)
+    })
   })
 })

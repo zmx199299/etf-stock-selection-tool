@@ -1,16 +1,24 @@
-import { mount } from '@vue/test-utils'
+import { flushPromises, mount } from '@vue/test-utils'
 import { reactive } from 'vue'
 import { createPinia, setActivePinia } from 'pinia'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import Analysis from '../Analysis.vue'
 import { useColorModeStore } from '../../stores/colorMode'
+import { getSharedFundCards } from '../../utils/dashboardSignals'
+
+const sharedCards = getSharedFundCards()
+const defaultEntryCards = sharedCards.slice(0, 10)
 
 const routeMock = vi.fn()
+const pushMock = vi.fn()
 const routeState = reactive({ query: { code: '510300' } as Record<string, string | undefined> })
 
 vi.mock('vue-router', () => ({
   useRoute: () => routeMock(),
+  useRouter: () => ({
+    push: pushMock,
+  }),
 }))
 
 describe('Analysis', () => {
@@ -18,6 +26,10 @@ describe('Analysis', () => {
     localStorage.clear()
     setActivePinia(createPinia())
     routeState.query = { code: '510300' }
+    pushMock.mockReset()
+    pushMock.mockImplementation(async (location: { query?: Record<string, string | undefined> }) => {
+      routeState.query = { ...(location.query ?? {}) }
+    })
     routeMock.mockImplementation(() => routeState)
   })
 
@@ -104,11 +116,120 @@ describe('Analysis', () => {
     expect(wrapper.get('[data-test="analysis-metric-value-MACD"]').text()).toContain('金叉')
   })
 
-  it('无基金代码时显示引导卡，并允许页内搜索后切换到分析态', async () => {
+  it('直接点击第三页时顶部显示承接自第一页的基金卡片，而不是固定示例按钮', () => {
     routeState.query = {}
     const wrapper = mount(Analysis)
 
-    expect(wrapper.get('[data-test="analysis-empty-state"]').text()).toContain('请选择基金')
+    const entryStrip = wrapper.get('[data-test="analysis-entry-strip"]')
+    const entryButtons = wrapper.findAll('[data-test^="analysis-entry-card-"]')
+
+    expect(entryStrip.attributes('data-test')).toBe('analysis-entry-strip')
+    expect(entryButtons).toHaveLength(10)
+    expect(wrapper.find('[data-test="analysis-pick-159915"]').exists()).toBe(false)
+
+    defaultEntryCards.forEach((card) => {
+      expect(wrapper.get(`[data-test="analysis-entry-card-${card.code}"]`).text()).toContain(card.name)
+    })
+  })
+
+  it('无参卡片页通过与首页同源的共享加载器生成入口卡片', async () => {
+    routeState.query = {}
+    vi.resetModules()
+    vi.doMock('../../utils/dashboardSignals', async () => {
+      const actual = await vi.importActual<typeof import('../../utils/dashboardSignals')>(
+        '../../utils/dashboardSignals',
+      )
+
+      const cards = [
+        {
+          code: '699999',
+          name: '联动基金A',
+          tPlus: 'T+0',
+          currentPrice: 1.111,
+          changePct: 1.11,
+          buyPrice: null,
+          sellPrice: null,
+          stopLoss: null,
+          latestNav: 1.11,
+          navDate: '2026-03-30',
+          premiumRate: 0.11,
+          expectedProfit: null,
+          expectedProfitPct: null,
+          maxLoss: null,
+          maxLossPct: null,
+        },
+        ...actual.getSharedFundCards().slice(0, 9),
+      ]
+
+      return {
+        ...actual,
+        loadSharedFundCards: async () => cards,
+        getSharedFundCards: () => cards,
+        getAnalysisEntryCards: (routeCode?: string | null, sharedCards = cards) => actual.getAnalysisEntryCards(routeCode, sharedCards),
+      }
+    })
+
+    const { default: SharedAnalysis } = await import('../Analysis.vue')
+    const wrapper = mount(SharedAnalysis)
+
+    await flushPromises()
+
+    expect(wrapper.get('[data-test="analysis-entry-card-699999"]').text()).toContain('联动基金A')
+
+    vi.doUnmock('../../utils/dashboardSignals')
+  })
+
+  it('路由未带 code 时保留顶部横栏与卡片页，但不显示详情主体', () => {
+    routeState.query = {}
+    const wrapper = mount(Analysis)
+
+    expect(wrapper.find('[data-test="analysis-topbar"]').exists()).toBe(true)
+    expect(wrapper.find('[data-test="analysis-entry-strip"]').exists()).toBe(true)
+    expect(wrapper.findAll('[data-test^="analysis-entry-card-"]')).toHaveLength(10)
+    expect(wrapper.get('[data-test="analysis-empty-state"]').text()).toContain('请从顶部卡片或搜索选择基金')
+    expect(wrapper.find('[data-test="analysis-section-summary"]').exists()).toBe(false)
+    expect(wrapper.find('[data-test="analysis-section-chart"]').exists()).toBe(false)
+  })
+
+  it('点击顶部基金卡片后进入纯详情页并重置周期为 day', async () => {
+    routeState.query = {}
+    const wrapper = mount(Analysis)
+
+    await wrapper.get('[data-test="analysis-entry-card-159915"]').trigger('click')
+
+    expect(pushMock).toHaveBeenCalledWith({
+      name: 'analysis',
+      query: { code: '159915' },
+    })
+    expect(wrapper.text()).toContain('创业板ETF')
+    expect(wrapper.find('[data-test="analysis-empty-state"]').exists()).toBe(false)
+    expect(wrapper.find('[data-test="analysis-entry-strip"]').exists()).toBe(false)
+    expect((wrapper.get('[data-test="analysis-period-select"]').element as HTMLSelectElement).value).toBe('day')
+    expect(wrapper.get('[data-test="analysis-period-summary"]').text()).toContain('日K')
+  })
+
+  it('带 code 进入时直接显示纯详情页，不再展示顶部卡片页', () => {
+    const wrapper = mount(Analysis)
+
+    expect(wrapper.find('[data-test="analysis-topbar"]').exists()).toBe(true)
+    expect(wrapper.find('[data-test="analysis-entry-strip"]').exists()).toBe(false)
+    expect(wrapper.find('[data-test="analysis-empty-state"]').exists()).toBe(false)
+    expect(wrapper.get('[data-test="analysis-section-summary"]').text()).toContain('沪深300ETF')
+  })
+
+  it('点击默认顶部卡片中的共享基金后会进入对应分析态，而不是回到空态', async () => {
+    routeState.query = {}
+    const wrapper = mount(Analysis)
+
+    await wrapper.get('[data-test="analysis-entry-card-513130"]').trigger('click')
+
+    expect(wrapper.find('[data-test="analysis-empty-state"]').exists()).toBe(false)
+    expect(wrapper.get('[data-test="analysis-section-summary"]').text()).toContain('恒生科技ETF')
+  })
+
+  it('无基金代码时仍允许页内搜索后切换到分析态', async () => {
+    routeState.query = {}
+    const wrapper = mount(Analysis)
 
     await wrapper.get('[data-test="analysis-search"]').setValue('创业板')
     expect(wrapper.findAll('[data-test="analysis-pick-159915"]')).toHaveLength(1)
@@ -118,11 +239,28 @@ describe('Analysis', () => {
     expect(wrapper.find('[data-test="analysis-empty-state"]').exists()).toBe(false)
   })
 
+  it('顶部搜索也能命中共享入口中的轻量分析基金', async () => {
+    routeState.query = {}
+    const wrapper = mount(Analysis)
+
+    await wrapper.get('[data-test="analysis-search"]').setValue('513130')
+
+    expect(wrapper.findAll('[data-test="analysis-pick-513130"]')).toHaveLength(1)
+
+    await wrapper.get('[data-test="analysis-pick-513130"]').trigger('click')
+
+    expect(pushMock).toHaveBeenCalledWith({
+      name: 'analysis',
+      query: { code: '513130' },
+    })
+    expect(wrapper.get('[data-test="analysis-section-summary"]').text()).toContain('恒生科技ETF')
+  })
+
   it('无效基金代码时保持空状态并显示无结果提示', async () => {
     routeState.query = { code: '000000' }
     const wrapper = mount(Analysis)
 
-    expect(wrapper.get('[data-test="analysis-empty-state"]').text()).toContain('请选择基金')
+    expect(wrapper.get('[data-test="analysis-empty-state"]').text()).toContain('请从顶部卡片或搜索选择基金')
 
     await wrapper.get('[data-test="analysis-search"]').setValue('不存在')
 
@@ -141,8 +279,8 @@ describe('Analysis', () => {
     await wrapper.vm.$forceUpdate()
     await wrapper.vm.$nextTick()
 
-    expect(wrapper.text()).toContain('沪深300ETF')
-    expect(wrapper.text()).not.toContain('创业板ETF')
+    expect(wrapper.get('[data-test="analysis-section-summary"]').text()).toContain('沪深300ETF')
+    expect(wrapper.get('[data-test="analysis-section-summary"]').text()).not.toContain('创业板ETF')
   })
 
   it('路由代码被清空后回到无代码引导态', async () => {
@@ -158,7 +296,7 @@ describe('Analysis', () => {
     routeState.query = {}
     await wrapper.vm.$nextTick()
 
-    expect(wrapper.get('[data-test="analysis-empty-state"]').text()).toContain('请选择基金')
+    expect(wrapper.get('[data-test="analysis-empty-state"]').text()).toContain('请从顶部卡片或搜索选择基金')
   })
 
   it('路由带 code 进入后页内切换基金，再清空路由时仍会回到空态', async () => {
@@ -171,19 +309,27 @@ describe('Analysis', () => {
     routeState.query = {}
     await wrapper.vm.$nextTick()
 
-    expect(wrapper.get('[data-test="analysis-empty-state"]').text()).toContain('请选择基金')
+    expect(wrapper.get('[data-test="analysis-empty-state"]').text()).toContain('请从顶部卡片或搜索选择基金')
+  })
+
+  it('路由带入共享 getter 额外提供的 code 时，直接进入该基金详情态且不显示卡片页', () => {
+    const wrapper = mount(Analysis)
+
+    expect(getSharedFundCards().map((card) => card.code)).toContain('510300')
+    expect(wrapper.find('[data-test="analysis-entry-strip"]').exists()).toBe(false)
+    expect(wrapper.get('[data-test="analysis-section-summary"]').text()).toContain('沪深300ETF')
   })
 
   it('分析态下也可通过顶部搜索继续切换基金', async () => {
     const wrapper = mount(Analysis)
 
-    expect(wrapper.text()).toContain('沪深300ETF')
+    expect(wrapper.get('[data-test="analysis-section-summary"]').text()).toContain('沪深300ETF')
 
     await wrapper.get('[data-test="analysis-search"]').setValue('创业板')
     await wrapper.get('[data-test="analysis-pick-159915"]').trigger('click')
 
-    expect(wrapper.text()).toContain('创业板ETF')
-    expect(wrapper.text()).not.toContain('沪深300ETF')
+    expect(wrapper.get('[data-test="analysis-section-summary"]').text()).toContain('创业板ETF')
+    expect(wrapper.get('[data-test="analysis-section-summary"]').text()).not.toContain('沪深300ETF')
   })
 
   it('切换基金后图表周期会重置为默认 day', async () => {
@@ -292,6 +438,95 @@ describe('Analysis', () => {
 
     expect(lineHeight).toBeLessThanOrEqual(128)
     expect(bodyHeight).toBeLessThanOrEqual(lineHeight)
+  })
+
+  it('K 线 hover 时显示日期和 OHLC 浮层，移出后隐藏', async () => {
+    const wrapper = mount(Analysis)
+
+    const hitArea = wrapper.get('[data-test="analysis-chart-hit-area"]').element as HTMLDivElement
+    vi.spyOn(hitArea, 'getBoundingClientRect').mockReturnValue({
+      x: 40,
+      y: 50,
+      width: 320,
+      height: 160,
+      top: 50,
+      right: 360,
+      bottom: 210,
+      left: 40,
+      toJSON: () => ({}),
+    })
+
+    await wrapper.get('[data-test="analysis-chart-candle-hitbox-0"]').trigger('mouseenter', { clientX: 120, clientY: 96 })
+
+    const tooltip = wrapper.get('[data-test="analysis-chart-tooltip"]')
+
+    expect(tooltip.text()).toContain('日期：04-08')
+    expect(tooltip.text()).toContain('开盘：4.010')
+    expect(tooltip.text()).toContain('收盘：4.080')
+    expect(tooltip.text()).toContain('最高：4.100')
+    expect(tooltip.text()).toContain('最低：3.990')
+    expect(tooltip.attributes('style')).toContain('left: 92px;')
+    expect(tooltip.attributes('style')).toContain('top: 58px;')
+
+    await wrapper.get('[data-test="analysis-chart-hit-area"]').trigger('mouseleave')
+
+    expect(wrapper.find('[data-test="analysis-chart-tooltip"]').exists()).toBe(false)
+  })
+
+  it('分时 hover 时显示时间、价格和均价浮层', async () => {
+    const wrapper = mount(Analysis)
+
+    await wrapper.get('[data-test="analysis-period-select"]').setValue('intraday')
+    const hitArea = wrapper.get('[data-test="analysis-chart-hit-area"]').element as HTMLDivElement
+    vi.spyOn(hitArea, 'getBoundingClientRect').mockReturnValue({
+      x: 20,
+      y: 30,
+      width: 280,
+      height: 160,
+      top: 30,
+      right: 300,
+      bottom: 190,
+      left: 20,
+      toJSON: () => ({}),
+    })
+    await wrapper.get('[data-test="analysis-intraday-hitbox-0"]').trigger('mouseenter', { clientX: 88, clientY: 72 })
+
+    const tooltip = wrapper.get('[data-test="analysis-chart-tooltip"]')
+
+    expect(tooltip.text()).toContain('时间：09:30')
+    expect(tooltip.text()).toContain('价格：4.070')
+    expect(tooltip.text()).toContain('均价：4.060')
+    expect(tooltip.attributes('style')).toContain('left: 80px;')
+    expect(tooltip.attributes('style')).toContain('top: 54px;')
+  })
+
+  it('切换基金时会立即清空当前 hover 浮层', async () => {
+    routeState.query = {}
+    const wrapper = mount(Analysis)
+
+    await wrapper.get('[data-test="analysis-entry-card-513130"]').trigger('click')
+
+    const hitArea = wrapper.get('[data-test="analysis-chart-hit-area"]').element as HTMLDivElement
+    vi.spyOn(hitArea, 'getBoundingClientRect').mockReturnValue({
+      x: 40,
+      y: 50,
+      width: 320,
+      height: 160,
+      top: 50,
+      right: 360,
+      bottom: 210,
+      left: 40,
+      toJSON: () => ({}),
+    })
+
+    await wrapper.get('[data-test="analysis-chart-candle-hitbox-0"]').trigger('mouseenter', { clientX: 120, clientY: 96 })
+
+    expect(wrapper.find('[data-test="analysis-chart-tooltip"]').exists()).toBe(true)
+
+    await wrapper.get('[data-test="analysis-search"]').setValue('513500')
+    await wrapper.get('[data-test="analysis-pick-513500"]').trigger('click')
+
+    expect(wrapper.find('[data-test="analysis-chart-tooltip"]').exists()).toBe(false)
   })
 
   it('切到季K时不会因为重复时间轴文案触发 Vue 重复 key 警告', async () => {
