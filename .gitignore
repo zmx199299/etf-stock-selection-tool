@@ -10,3 +10,4 @@ dist/
 .envbackups/
 .superpowers/
 .worktrees/
+src-tauri/gen/

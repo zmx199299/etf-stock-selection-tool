@@ -89,11 +89,11 @@
 | API-02 | `get_engine_status` | — | P2 | ✅ 已实现（硬编码） | 未使用 |
 | API-03 | `get_dashboard_signals` | Dashboard, Analysis | **P0** | ✅ 已接真实数据 | ✅ invoke 已写，有 Mock 回退 |
 | API-04 | `get_fund_list` | FundList | **P0** | ✅ 已接真实数据 | ✅ invoke 已写，有 Mock 回退 |
-| API-05 | `get_fund_analysis` | Analysis | **P1** | ❌ 未实现 | ❌ 纯前端 Mock 查表 |
-| API-06 | `search_funds` | Analysis | **P1** | ❌ 未实现 | ❌ 纯前端 Mock 过滤 |
-| API-07 | `get_screening_results` | （未来筛选页） | P2 | ⚠️ 硬编码 Mock | 未使用 |
-| API-08 | `get_scoring_data` | （未来评分详情） | P2 | ⚠️ 硬编码 Mock | 未使用 |
-| API-09 | `get_scheduler_data` | （未来调度页） | P2 | ⚠️ 硬编码 Mock | 未使用 |
+| API-05 | `get_fund_analysis` | Analysis | **P1** | ✅ 已接真实数据 | ✅ invoke 已写，有 Mock 回退 |
+| API-06 | `search_funds` | Analysis | **P1** | ✅ 已接真实数据 | ✅ invoke 已写，有 Mock 回退 |
+| API-07 | `get_screening_results` | Screening | P2 | ✅ 已接真实数据 | ✅ invoke 已写，有 Mock 回退 |
+| API-08 | `get_scoring_data` | Scoring | P2 | ✅ 已接真实数据 | ✅ invoke 已写，有 Mock 回退 |
+| API-09 | `get_scheduler_data` | Scheduler | P2 | ✅ 已接真实数据 | ✅ invoke 已写，有 Mock 回退 |
 | API-10 | `fetch_legal_tax_rates` | （设置页/费用） | P2 | ✅ 硬编码但准确 | 未使用 |
 
 ---
@@ -407,13 +407,19 @@ score = max(1, min(10, round(total_score / 10)))
 | `ConfigManager` | `engine/utils/config.py` | JSON 配置文件读写 | ✅ 单元测试 |
 | `JSONRPCServer` | `engine/server.py` | JSON-RPC 2.0 请求处理 | ✅ 单元测试 |
 
-### 未串联的问题
+### 已完成的串联
 
-**`server.py` 中的所有业务方法都是硬编码 Mock**，没有调用上述任何模块。需要做的核心工作是：
+`server.py` 已完成核心业务方法的真实化收口，当前已接入真实模块或受控真实输出的接口包括：
 
-1. 在 server 启动时初始化 `Database` + `AkshareSource` + `TechnicalIndicators` + `Scorer`
-2. 每个 RPC 方法改为调用真实模块而非返回硬编码数据
-3. 新增数据同步流程（定时/手动从 akshare 拉取数据存入 SQLite）
+1. `get_dashboard_signals`
+2. `get_fund_list`
+3. `search_funds`
+4. `get_fund_analysis`
+5. `get_screening_results`
+6. `get_scoring_data`
+7. `get_scheduler_data`
+
+当前剩余工作不再是“接口从 0 到 1 接线”，而是后续增强与发布整理。
 
 ---
 
@@ -436,8 +442,11 @@ const result = await invoke('invoke_engine', {
 | 页面 | Tauri invoke | Mock 回退 | snake→camel 转换 |
 |---|---|---|---|
 | Dashboard | ✅ 已写 | ✅ 有 | ✅ `toSharedFundCard()` |
-| FundList | ✅ 已写 | ✅ 有 | ❌ **缺失** |
-| Analysis | ❌ 未写 | ✅ 纯 Mock | ❌ 不适用 |
+| FundList | ✅ 已写 | ✅ 有 | ✅ 已补齐 |
+| Analysis | ✅ 已写 | ✅ 有 | ✅ 已接适配层 |
+| Screening | ✅ 已写 | ✅ 有 | ✅ 页面内映射 |
+| Scoring | ✅ 已写 | ✅ 有 | ✅ 页面内映射 |
+| Scheduler | ✅ 已写 | ✅ 有 | ✅ 页面内映射 |
 | Settings | — | — | — （纯本地） |
 
 ---
@@ -449,14 +458,15 @@ const result = await invoke('invoke_engine', {
 | 编号 | 问题 | 优先级 | 说明 |
 |---|---|---|---|
 | ISSUE-01 | FundList 缺少 snake_case → camelCase 转换层 | P0 | 已解决：前端已补 `fundList.ts` 转换层 |
-| ISSUE-02 | Analysis 页面无 Tauri invoke 路径 | P1 | 需要新增 `get_fund_analysis` 调用 + Mock 回退 |
-| ISSUE-03 | server.py 业务方法全是硬编码 | P0 | 已部分解决：已新增 `create_real_server()` 串联真实模块，主入口后续继续收口 |
+| ISSUE-02 | Analysis 页面无 Tauri invoke 路径 | P1 | 已解决：已接 `search_funds` / `get_fund_analysis`，保留 Mock 回退 |
+| ISSUE-03 | server.py 业务方法全是硬编码 | P0 | 已基本解决：核心业务接口已完成真实化 |
 | ISSUE-04 | 缺少数据同步流程 | P0 | 已解决：`DataSyncPipeline` 已实现 fund list / daily quotes / nav 同步 |
 | ISSUE-05 | `get_dashboard_signals` 缺少 `change_pct` 字段 | P0 | 已解决：真实信号构建中已计算并返回 `change_pct` |
 | ISSUE-06 | K线数据顺序约定 | P1 | 前端当前为 `[open, close, low, high]`，非标准 OHLC 顺序，需统一 |
-| ISSUE-07 | Scorer 评分逻辑过于简单 | P2 | 当前固定返回 60 分，需要根据真实指标数据计算 |
-| ISSUE-08 | 技术指标→文字描述的转换逻辑 | P1 | 已部分解决：`FundService` 已实现 FundList 所需的 MACD/RSI/BOLL/MA5/MA20 文字化 |
-| ISSUE-09 | 分钟级数据源 | P2 | `intraday`/`m5`/`m60`/`m120` 周期需要分钟级行情数据，akshare 是否支持待确认 |
+| ISSUE-07 | Scorer 评分逻辑过于简单 | P2 | 已解决：已按真实指标评分并补齐短样本/异常值保护 |
+| ISSUE-08 | 技术指标→文字描述的转换逻辑 | P1 | 已进一步解决：FundList 与 Analysis 均已有真实文字化输出 |
+| ISSUE-09 | 分钟级数据源 | P2 | 已确认 akshare 支持 ETF/LOF 分钟级数据，`m120` 由 `m60` 聚合 |
+| ISSUE-10 | Tauri 正式图标资源缺失 | P2 | 已临时补 `src-tauri/icons/icon.png` 占位资源，后续可替换正式图标 |
 
 ### 实施优先级建议
 
@@ -468,15 +478,15 @@ const result = await invoke('invoke_engine', {
   └─ 前端 FundList 补 snake→camel 转换 ✅
 
 第二步（P1 分析页）：
-  ├─ 新增 get_fund_analysis 接口（先做日线周期）
-  ├─ 新增 search_funds 接口
-  ├─ 前端 Analysis 页补 invoke 调用
-  └─ 技术指标文字化逻辑
+  ├─ 新增 get_fund_analysis 接口（先做日线周期） ✅
+  ├─ 新增 search_funds 接口 ✅
+  ├─ 前端 Analysis 页补 invoke 调用 ✅
+  └─ 技术指标文字化逻辑 ✅
 
 第三步（P2 增强）：
-  ├─ 扩展 get_fund_analysis 到更多周期
-  ├─ 增强 Scorer 评分逻辑
-  └─ 分钟级数据支持
+  ├─ 扩展 get_fund_analysis 到更多周期 ✅
+  ├─ 增强 Scorer 评分逻辑 ✅
+  └─ 分钟级数据支持 ✅
 ```
 
 ---
@@ -487,3 +497,4 @@ const result = await invoke('invoke_engine', {
 |---|---|
 | 2026-04-04 | 初始版本：梳理全部前端数据需求 + 后端已有能力，定义 6 个核心接口 |
 | 2026-04-04 | 更新 P0 状态：已实现 DataSyncPipeline、FundService、真实 `get_fund_list` / `get_dashboard_signals` 路径，并修复 Python 测试到 49 passed / 2 skipped |
+| 2026-04-04 | 更新 P1/P2 状态：已完成 `search_funds`、`get_fund_analysis`、`get_screening_results`、`get_scoring_data`、`get_scheduler_data` 真实化；全量验证结果为 Python 49 passed / 2 skipped、前端 112 passed、`npm run build` 通过、Rust `cargo check` 与 `cargo test` 通过 |

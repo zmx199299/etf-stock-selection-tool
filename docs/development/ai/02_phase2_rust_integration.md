@@ -1,5 +1,7 @@
 # Phase 2 Documentation: Rust Engine Manager & IPC (AI Context)
 
+> 历史快照：本文记录的是早期 Phase 2 阶段状态，**不是当前项目真实状态**。继续开发时请优先读取 `docs/development/ai/current_state.md`。
+
 ## File Structures & Code State
 - `src-tauri/src/main.rs`: Defines `AppState { engine: Mutex<EngineManager> }`. Exports Tauri commands `start_engine`, `stop_engine`, `invoke_engine`.
 - `src-tauri/src/engine.rs`: Encapsulates `std::process::Child`. 

@@ -1,5 +1,7 @@
 # Phase 3 Documentation: Frontend Vue & Visualization (AI Context)
 
+> 历史快照：本文记录的是早期 Phase 3 阶段状态，**不是当前项目真实状态**。继续开发时请优先读取 `docs/development/ai/current_state.md`。
+
 ## File Structure & Current State
 - `src/layouts/MainLayout.vue`: Global layout with sidebar and RouterView
 - `src/views/Dashboard.vue`: Overview page with stats grid and mock signals table

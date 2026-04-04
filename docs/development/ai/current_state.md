@@ -1,10 +1,10 @@
 # ETF 智能分析系统 - AI 当前状态指针
 
-**最后更新**: 2026-04-04 晚间 (UTC+8)
+**最后更新**: 2026-04-04 22:20 (UTC+8)
 
 ## 1. 当前阶段
 
-当前阶段为 **P0 真实数据基础链路已打通，准备进入 P1 Analysis 接口开发**。
+当前阶段为 **P2 真实链路收口已完成，处于提交 / 发布前最终验证完成状态**。
 
 ## 2. 当前已完成内容
 
@@ -40,8 +40,12 @@
 - `dashboardSignals.ts` — 共享基金卡片数据源与加载器，`getAnalysisEntryCards()` 支持 `count` 参数。
 - `DataSyncPipeline` — 后端数据同步管道，支持基金列表、日线行情、净值同步到 SQLite。
 - `FundService` — 后端业务层，支持基金列表、指标计算、FundList 所需的技术指标文字化与评分映射。
-- `create_real_server()` — 后端真实服务装配入口，已可返回真实 `get_fund_list` 与 `get_dashboard_signals` 数据。
-- 测试基线：前端 11 个测试文件，112 个测试用例全部通过；Python 端 49 个测试通过，2 个外部依赖测试按环境跳过。
+- `create_real_server()` — 后端真实服务装配入口，已可返回真实 `get_fund_list`、`get_dashboard_signals`、`search_funds`、`get_fund_analysis`、`get_scoring_data`、`get_screening_results`、`get_scheduler_data` 数据。
+- `AnalysisService` — 已支持 Analysis 页面九周期真实数据：`intraday`、`day`、`m5`、`m60`、`m120`、`week`、`month`、`quarter`、`year`。
+- `Scorer` / `AnalysisService.strategy` / `risk_level` — 已从占位逻辑升级为真实计算与降级保护逻辑。
+- Rust `EngineManager` — 已支持自动启动、断连恢复、错误透传，前端无需手动先调用 `start_engine`。
+- Tauri 默认构建资源已收口：补齐 `src-tauri/icons/icon.png` 占位图标，默认 `cargo check` / `cargo test` 可运行。
+- 测试基线：前端 11 个测试文件，112 个测试用例全部通过；Python 端 49 个测试通过，2 个外部依赖测试按环境跳过；Rust 端 `cargo check` 通过，`cargo test` 通过（当前 0 个单元测试）。
 - TypeScript 类型检查 + Vite 构建通过。
 
 ## 3. 当前约束
@@ -53,7 +57,9 @@
 
 ## 4. 下一步
 
-- P0 已完成：数据同步、`get_fund_list`、`get_dashboard_signals`、FundList snake_case/camelCase 转换已落地。
-- 当前应进入 P1：定义并实现 `get_fund_analysis` 与 `search_funds` 两个核心接口。
-- Analysis 页当前仍是纯前端 Mock，需要补上 Tauri invoke 调用与真实后端回退链路。
-- `create_real_server()` 已就位，但 Python 主入口与 Rust 中间层的真实运行路径还需继续核对与收口。
+- 当前主线功能已完成真实链路收口，下一步以提交、PR 或发布整理为主。
+- 若继续推进，优先级建议为：
+- 1. 统一清理过期文档描述，避免 P0/P1 旧状态误导后续开发。
+- 2. 为 Rust `EngineManager` 补充真正的自动化单元测试，避免 `cargo test` 长期为 0 tests。
+- 3. 若进入发布准备，补齐 Tauri 正式图标资源，替换当前占位 `icon.png`。
+- 4. 根据用户决定执行提交、建 PR 或继续功能迭代。

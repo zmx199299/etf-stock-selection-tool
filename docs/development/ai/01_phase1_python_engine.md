@@ -1,5 +1,7 @@
 # Phase 1 Documentation: Python Core Engine (AI Context)
 
+> 历史快照：本文记录的是早期 Phase 1 阶段状态，**不是当前项目真实状态**。继续开发时请优先读取 `docs/development/ai/current_state.md`。
+
 ## Architecture & State
 - **Role**: Backend sub-process running as a sidecar via standard I/O (stdin/stdout).
 - **Communication Protocol**: JSON-RPC 2.0. Incoming lines are parsed as requests, responses are written as single-line JSON to stdout.
