@@ -1,9 +1,12 @@
 """分析数据服务：将数据库数据转换为前端 AnalysisPeriod 格式"""
+import logging
 import pandas as pd
 from typing import Optional
 from engine.models.database import Database
 from engine.scoring.indicators import TechnicalIndicators
+from engine.data.base import DataSource
 
+logger = logging.getLogger(__name__)
 
 # 周期标签映射
 PERIOD_LABELS = {
@@ -18,13 +21,17 @@ PERIOD_LABELS = {
     "year": "年K",
 }
 
+# 需要实时联网获取的周期（东方财富 API，按需拉取 + 缓存）
+LIVE_FETCH_PERIODS = {"intraday", "m5", "m60", "m120"}
+
 
 class AnalysisService:
     """分析数据服务"""
 
-    def __init__(self, db: Database, indicators: TechnicalIndicators):
+    def __init__(self, db: Database, indicators: TechnicalIndicators, source: Optional[DataSource] = None):
         self.db = db
         self.indicators = indicators
+        self.source = source  # 用于实时获取分钟线数据
 
     def get_analysis_data(self, code: str) -> Optional[dict]:
         """获取指定基金的完整分析数据"""
@@ -63,17 +70,109 @@ class AnalysisService:
             "riskLevel": self._estimate_risk_level(df),
             "strategy": self._generate_strategy(df),
             "periods": {
-                "intraday": self.get_intraday_period(code),
+                "intraday": self._get_period_with_live_fallback(code, "intraday", "1"),
                 "day": self.get_day_period(code),
-                "m5": self.get_minute_period(code, "m5", "5"),
-                "m60": self.get_minute_period(code, "m60", "60"),
-                "m120": self.get_minute_period(code, "m120", "120"),
+                "m5": self._get_period_with_live_fallback(code, "m5", "5"),
+                "m60": self._get_period_with_live_fallback(code, "m60", "60"),
+                "m120": self._get_period_with_live_fallback(code, "m120", "120"),
                 "week": self.get_aggregated_period(code, "week"),
                 "month": self.get_aggregated_period(code, "month"),
                 "quarter": self.get_aggregated_period(code, "quarter"),
                 "year": self.get_aggregated_period(code, "year"),
             },
         }
+
+    def _get_period_with_live_fallback(self, code: str, key: str, ak_period: str) -> dict:
+        """获取周期数据，优先从数据库读取，无数据时实时联网获取"""
+        if key not in LIVE_FETCH_PERIODS:
+            # 非实时周期，直接走数据库
+            if key in ("m5", "m60", "m120"):
+                return self.get_minute_period(code, key, ak_period)
+            elif key == "intraday":
+                return self.get_intraday_period(code)
+            return self._empty_period(key)
+
+        # 120 分钟从数据库聚合，不直接联网
+        if ak_period == "120":
+            return self._get_120m_period(code)
+
+        # 先查数据库缓存
+        if ak_period == "1":
+            db_result = self.get_intraday_period(code)
+        else:
+            db_result = self.get_minute_period(code, key, ak_period)
+
+        # 如果数据库有数据，直接返回
+        if db_result.get("candles") or db_result.get("linePoints"):
+            return db_result
+
+        # 数据库无数据，尝试实时联网获取
+        if not self.source:
+            logger.warning(f"No data source available for live fetch of {code} {key}")
+            return db_result
+
+        try:
+            logger.info(f"Live fetching {key} data for {code}")
+            quotes = self.source.fetch_minute_quotes(code, ak_period)
+            if not quotes:
+                return db_result
+
+            # 写入数据库缓存
+            for q in quotes:
+                q["code"] = code
+                q["period"] = ak_period
+            self.db.upsert_minute_quotes(quotes)
+
+            # 120 分钟聚合
+            if ak_period == "60":
+                quotes_120m = self.db.aggregate_120m_from_60m(code)
+                if quotes_120m:
+                    self.db.upsert_minute_quotes(quotes_120m)
+
+            # 重新从数据库读取
+            if ak_period == "1":
+                return self.get_intraday_period(code)
+            else:
+                return self.get_minute_period(code, key, ak_period)
+
+        except Exception as e:
+            logger.warning(f"Live fetch failed for {code} {key}: {e}")
+            return db_result
+
+    def _get_120m_period(self, code: str) -> dict:
+        """获取 120 分钟周期数据（从 60 分钟聚合）"""
+        # 先尝试从数据库读取
+        quotes_60m = self.db.get_minute_quotes(code, "60", "2000-01-01 00:00:00", "2099-12-31 23:59:59")
+        if quotes_60m:
+            quotes_120m = self.db.aggregate_120m_from_60m(code)
+            if quotes_120m:
+                self.db.upsert_minute_quotes(quotes_120m)
+                return self.get_minute_period(code, "m120", "120")
+
+        # 数据库无 60 分钟数据，尝试实时获取
+        if not self.source:
+            return self._empty_period("m120")
+
+        try:
+            logger.info(f"Live fetching 60m data for {code} to aggregate 120m")
+            quotes = self.source.fetch_minute_quotes(code, "60")
+            if not quotes:
+                return self._empty_period("m120")
+
+            for q in quotes:
+                q["code"] = code
+                q["period"] = "60"
+            self.db.upsert_minute_quotes(quotes)
+
+            quotes_120m = self.db.aggregate_120m_from_60m(code)
+            if quotes_120m:
+                self.db.upsert_minute_quotes(quotes_120m)
+                return self.get_minute_period(code, "m120", "120")
+
+            return self._empty_period("m120")
+        except Exception as e:
+            logger.warning(f"Live fetch 60m failed for {code}: {e}")
+            return self._empty_period("m120")
 
     def get_day_period(self, code: str) -> dict:
         """获取日线周期数据"""

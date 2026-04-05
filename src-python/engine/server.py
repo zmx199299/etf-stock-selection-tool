@@ -293,7 +293,7 @@ def create_real_server(db, source):
     scorer = Scorer()
     fund_service = FundService(db, indicators, scorer)
     sync_pipeline = DataSyncPipeline(db, source)
-    analysis_service = AnalysisService(db, indicators)
+    analysis_service = AnalysisService(db, indicators, source)
 
     # 注册方法
     server.register_method("ping", lambda: "pong")
