@@ -291,7 +291,7 @@ score = max(1, min(10, round(total_score / 10)))
 **周期数据通用说明**：
 - `intraday`（分时）：`candles` 为空数组，使用 `line_points` + `avg_line_points` 画折线图
 - 其他周期：`line_points` 和 `avg_line_points` 为空数组，使用 `candles` 画K线图
-- `candles` 格式：`[[open, close, low, high], ...]`（注意：当前前端约定的顺序）
+- `candles` 格式：`[[open, high, low, close], ...]`（标准 OHLC 顺序）
 - `volumes`：与 `candles` 或 `line_points` 等长的成交量数组
 - `metrics`：每个周期最多 4 个技术指标卡片
 

@@ -475,7 +475,7 @@ const chartCandles = computed(() => {
   const maxBodyHeight = 104
 
   return Array.from({ length: 12 }, (_, index) => {
-     const [open, close, low, high] = baseCandles[index % baseCandles.length] ?? [0, 0, 0, 0]
+     const [open, high, low, close] = baseCandles[index % baseCandles.length] ?? [0, 0, 0, 0]
       const label = activePeriod.value?.timeAxis[index % (activePeriod.value?.timeAxis.length || 1)] ?? ''
       const priceRange = Math.max(high - low, 0.01)
       const bodyRange = Math.max(Math.abs(close - open), priceRange * 0.35)

@@ -63,11 +63,11 @@ describe('analysisMock', () => {
     const result = getAnalysisMockByCode('510300')
 
     expect(result?.periods.day.candles).toEqual([
-      [4.01, 4.08, 3.99, 4.1],
-      [4.08, 4.06, 4.03, 4.11],
-      [4.06, 4.12, 4.05, 4.13],
-      [4.12, 4.11, 4.08, 4.14],
-      [4.11, 4.13, 4.1, 4.15],
+      [4.01, 4.1, 3.99, 4.08],
+      [4.08, 4.11, 4.03, 4.06],
+      [4.06, 4.13, 4.05, 4.12],
+      [4.12, 4.14, 4.08, 4.11],
+      [4.11, 4.15, 4.1, 4.13],
     ])
     expect(result?.periods.day.volumes).toEqual([860000, 790000, 920000, 880000, 950000])
     expect(result?.periods.day.metrics).toEqual([
@@ -151,7 +151,7 @@ describe('analysisMock', () => {
     first.periods.day.candles[0][1] = 0
 
     expect(second.periods.day.priceAxis[0]).toBe('3.96')
-    expect(second.periods.day.candles[0][1]).toBe(4.08)
+    expect(second.periods.day.candles[0][1]).toBe(4.1)
   })
 
   it('搜索结果返回值彼此隔离', () => {
