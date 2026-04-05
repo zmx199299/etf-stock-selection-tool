@@ -76,7 +76,7 @@
           </div>
           <div class="rounded-xl bg-slate-50 p-3">
             <p class="text-xs text-slate-500">版本</p>
-            <p class="mt-1 text-base font-semibold text-slate-900">v0.0.1 预览版</p>
+            <p class="mt-1 text-base font-semibold text-slate-900">{{ previewVersion }}</p>
           </div>
           <div class="rounded-xl bg-slate-50 p-3">
             <p class="text-xs text-slate-500">开源协议</p>
@@ -125,6 +125,7 @@
 
 <script setup lang="ts">
 import { onMounted } from 'vue'
+import packageJson from '../../package.json'
 
 import { useColorModeStore } from '../stores/colorMode'
 import { useDisplaySettingsStore } from '../stores/displaySettings'
@@ -132,6 +133,7 @@ import type { CardCount } from '../stores/displaySettings'
 
 const colorMode = useColorModeStore()
 const displaySettings = useDisplaySettingsStore()
+const previewVersion = `v${packageJson.version} 预览版`
 
 function onCardCountChange(event: Event) {
   const value = Number((event.target as HTMLSelectElement).value)

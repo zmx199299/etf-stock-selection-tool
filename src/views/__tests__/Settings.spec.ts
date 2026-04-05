@@ -1,6 +1,7 @@
 import { mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { beforeEach, describe, expect, it } from 'vitest'
+import packageJson from '../../../package.json'
 
 import Settings from '../Settings.vue'
 import { useColorModeStore } from '../../stores/colorMode'
@@ -91,7 +92,7 @@ describe('Settings', () => {
 
     const about = wrapper.get('[data-test="settings-card-about"]')
     expect(about.text()).toContain('FUNDFLOW')
-    expect(about.text()).toContain('v0.0.1 预览版')
+    expect(about.text()).toContain(`v${packageJson.version} 预览版`)
     expect(about.text()).toContain('GPLv3')
     expect(about.text()).toContain('仅抓取行情')
   })
