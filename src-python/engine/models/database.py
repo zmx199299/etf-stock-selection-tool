@@ -26,7 +26,8 @@ class Database:
             invest_type TEXT NOT NULL,
             t_plus TEXT NOT NULL,
             list_date TEXT,
-            is_excluded INTEGER DEFAULT 0
+            is_excluded INTEGER DEFAULT 0,
+            has_market_data INTEGER DEFAULT 1
         );
         CREATE TABLE IF NOT EXISTS daily_quote (
             code TEXT NOT NULL,
@@ -37,6 +38,13 @@ class Database:
             prev_close REAL,
             is_suspended INTEGER DEFAULT 0,
             suspended_days INTEGER DEFAULT 0,
+            PRIMARY KEY (code, date),
+            FOREIGN KEY (code) REFERENCES fund_info(code)
+        );
+        CREATE TABLE IF NOT EXISTS fund_nav_history (
+            code TEXT NOT NULL,
+            date TEXT NOT NULL,
+            nav REAL NOT NULL,
             PRIMARY KEY (code, date),
             FOREIGN KEY (code) REFERENCES fund_info(code)
         );
@@ -82,14 +90,17 @@ class Database:
     def upsert_fund_info(self, funds: list[dict]):
         c = self.conn.cursor()
         for f in funds:
+            record = dict(f)
+            record.setdefault("has_market_data", 1)
             c.execute("""
-                INSERT INTO fund_info (code,name,fund_type,invest_type,t_plus,list_date,is_excluded)
-                VALUES (:code,:name,:fund_type,:invest_type,:t_plus,:list_date,:is_excluded)
+                INSERT INTO fund_info (code,name,fund_type,invest_type,t_plus,list_date,is_excluded,has_market_data)
+                VALUES (:code,:name,:fund_type,:invest_type,:t_plus,:list_date,:is_excluded,:has_market_data)
                 ON CONFLICT(code) DO UPDATE SET
                     name=excluded.name, fund_type=excluded.fund_type,
                     invest_type=excluded.invest_type, t_plus=excluded.t_plus,
-                    list_date=excluded.list_date, is_excluded=excluded.is_excluded
-            """, f)
+                    list_date=excluded.list_date, is_excluded=excluded.is_excluded,
+                    has_market_data=excluded.has_market_data
+            """, record)
         self.conn.commit()
 
     def get_fund_info(self, code: str) -> Optional[dict]:
@@ -101,6 +112,11 @@ class Database:
     def get_all_active_funds(self) -> list[dict]:
         c = self.conn.cursor()
         c.execute("SELECT * FROM fund_info WHERE is_excluded=0")
+        return [dict(r) for r in c.fetchall()]
+
+    def get_all_funds_with_market_data(self) -> list[dict]:
+        c = self.conn.cursor()
+        c.execute("SELECT * FROM fund_info WHERE is_excluded=0 AND has_market_data=1")
         return [dict(r) for r in c.fetchall()]
 
     def upsert_daily_quotes(self, quotes: list[dict]):
@@ -137,6 +153,27 @@ class Database:
         row = c.fetchone()
         return row[0] if row and row[0] else None
 
+    def upsert_fund_nav_history(self, rows: list[dict]):
+        c = self.conn.cursor()
+        for row in rows:
+            c.execute(
+                """
+                INSERT INTO fund_nav_history (code, date, nav)
+                VALUES (:code, :date, :nav)
+                ON CONFLICT(code, date) DO UPDATE SET nav=excluded.nav
+                """,
+                row,
+            )
+        self.conn.commit()
+
+    def get_fund_nav_history(self, code: str, start: str, end: str) -> list[dict]:
+        c = self.conn.cursor()
+        c.execute(
+            "SELECT * FROM fund_nav_history WHERE code=? AND date>=? AND date<=? ORDER BY date",
+            (code, start, end),
+        )
+        return [dict(r) for r in c.fetchall()]
+
     def _update_nav(self, code: str, date: str, nav: float):
         """仅更新净值，如果记录不存在则不插入"""
         c = self.conn.cursor()
@@ -151,4 +188,9 @@ class Database:
                 "UPDATE daily_quote SET nav=?, premium_rate=? WHERE code=? AND date=?",
                 (nav, premium_rate, code, date)
             )
+        self.conn.commit()
+
+    def update_has_market_data(self, code: str, value: int):
+        c = self.conn.cursor()
+        c.execute("UPDATE fund_info SET has_market_data=? WHERE code=?", (value, code))
         self.conn.commit()
