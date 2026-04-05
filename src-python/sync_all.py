@@ -117,32 +117,27 @@ def sync_full_market_funds(db: Database) -> tuple[int, int, int, int]:
     t0 = time.time()
     latest_nav_snapshots = load_latest_nav_snapshots()
     nav_total = 0
-    nav_covered = 0
+    nav_skipped = 0
     for index, fund in enumerate(fund_records, start=1):
         code = fund["code"]
         snapshot = latest_nav_snapshots.get(code)
         if snapshot is None:
-            raise RuntimeError(f"{code} 缺少最新净值快照，停止导入")
+            logger.warning(f"  警告: {code} 缺少最新净值快照，跳过")
+            nav_skipped += 1
+            continue
 
         db.upsert_fund_nav_history([
             {"code": code, "date": snapshot["date"], "nav": snapshot["nav"]}
         ])
-        db._update_nav(code, snapshot["date"], snapshot["nav"])
+        db.update_daily_quote_nav_and_premium(
+            code, snapshot["date"], snapshot["nav"], snapshot.get("premium_rate")
+        )
         nav_total += 1
-        nav_covered += 1
-
-        if snapshot.get("premium_rate") is not None:
-            c = db.conn.cursor()
-            c.execute(
-                "UPDATE daily_quote SET premium_rate=? WHERE code=? AND date=?",
-                (snapshot["premium_rate"], code, snapshot["date"]),
-            )
-            db.conn.commit()
 
         if index % 200 == 0 or index == len(fund_records):
             logger.info(f"  进度: {index}/{len(fund_records)}，累计 {nav_total} 条最新净值")
 
-    logger.info(f"  完成: {nav_total} 条最新净值快照 (覆盖 {nav_covered}/{len(fund_records)}, 耗时 {time.time() - t0:.1f}s)")
+    logger.info(f"  完成: {nav_total} 条最新净值快照 (跳过 {nav_skipped} 只, 耗时 {time.time() - t0:.1f}s)")
 
     return len(fund_records), quotes_total, nav_total, skipped_no_market
 

@@ -196,3 +196,17 @@ class Database:
         c = self.conn.cursor()
         c.execute("UPDATE fund_info SET has_market_data=? WHERE code=?", (value, code))
         self.conn.commit()
+
+    def update_daily_quote_nav_and_premium(self, code: str, date: str, nav: float, premium_rate: float | None = None):
+        c = self.conn.cursor()
+        c.execute("SELECT close FROM daily_quote WHERE code=? AND date=?", (code, date))
+        row = c.fetchone()
+        if row:
+            close_price = row[0]
+            if premium_rate is None and nav > 0:
+                premium_rate = (close_price - nav) / nav
+            c.execute(
+                "UPDATE daily_quote SET nav=?, premium_rate=? WHERE code=? AND date=?",
+                (nav, premium_rate, code, date)
+            )
+            self.conn.commit()
