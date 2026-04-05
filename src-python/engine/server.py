@@ -284,6 +284,7 @@ def create_real_server(db, source):
     from engine.scoring.indicators import TechnicalIndicators
     from engine.scoring.scorer import Scorer
     from engine.sync import DataSyncPipeline
+    from engine.services.analysis_service import AnalysisService
     
     server = JSONRPCServer()
 
@@ -292,6 +293,7 @@ def create_real_server(db, source):
     scorer = Scorer()
     fund_service = FundService(db, indicators, scorer)
     sync_pipeline = DataSyncPipeline(db, source)
+    analysis_service = AnalysisService(db, indicators)
 
     # 注册方法
     server.register_method("ping", lambda: "pong")
@@ -310,6 +312,11 @@ def create_real_server(db, source):
         return sync_pipeline.sync_all()
 
     server.register_method("sync_data", sync_data)
+
+    def get_analysis_data_real(code: str):
+        return analysis_service.get_analysis_data(code)
+
+    server.register_method("get_analysis_data", get_analysis_data_real)
 
     return server
 
