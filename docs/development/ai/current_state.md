@@ -1,10 +1,10 @@
 # ETF 智能分析系统 - AI 当前状态指针
 
-**最后更新**: 2026-04-05 22:00 (UTC+8)
+**最后更新**: 2026-04-05 23:49 (UTC+8)
 
 ## 1. 当前阶段
 
-当前阶段为 **全量库严格全量 + 标记隔离已完成**，7 个提交，65 个 Python 测试全绿，前端构建通过。下一步可开始 GitHub Actions 自动编译工作流。
+当前阶段为 **GitHub 三平台自动发布已打通并完成 `v0.0.4` 正式发布**。Linux（RPM/DEB/AppImage）、macOS（Intel/Apple Silicon DMG）和 Windows（MSI）均已成功出包。
 
 ## 2. 当前已完成内容
 
@@ -47,6 +47,29 @@
 - Tauri 图标资源已收口：`src-tauri/icons/` 下包含 16x16 至 512x512 多尺寸 PNG 及 `icon.png`，K 线蜡烛图标（commit `f7a3eb5`）。
 - 测试基线：前端 11 个测试文件，112 个测试用例全部通过；Python 端 **65 个测试通过**（2 个外部依赖测试按环境跳过）；Rust 端 `cargo test` **10 个测试全部通过**（从 5 个新增到 10 个，覆盖 JSON-RPC 请求序列化、响应解析、错误传播、req_id 递增、复杂参数往返）。
 - TypeScript 类型检查 + Vite 构建通过。
+
+### 发布与版本统一 (2026-04-05 深夜)
+
+- 发布版本已统一到 `v0.0.4`
+- 已同步更新：
+  - `package.json`
+  - `package-lock.json`
+  - `src-tauri/tauri.conf.json`
+  - `src-tauri/Cargo.toml`
+  - `src-tauri/Cargo.lock`
+- 系统设置页版本显示继续直接读取 `package.json`，当前展示为 `v0.0.4 预览版`
+- Windows 打包缺失图标问题已修复：
+  - 新增 `src-tauri/icons/icon.ico`
+  - `bundle.icon` 已包含 `icons/icon.ico`
+- 新增版本一致性保护测试，校验：
+  - `package.json` / `package-lock.json` / `tauri.conf.json` / `Cargo.toml` 版本一致
+  - Windows bundler 所需 `icons/icon.ico` 已登记到 Tauri 配置
+- `Release` workflow run `24004791161` 已全部成功
+- 正式发布地址：`https://github.com/zmx199299/etf-stock-selection-tool/releases/tag/v0.0.4`
+- 当前发布产物：
+  - Linux：RPM / DEB / AppImage
+  - macOS：x64 DMG / aarch64 DMG
+  - Windows：x64 MSI
 
 ### 全量库严格全量 + 标记隔离 (2026-04-05 下午)
 
@@ -111,12 +134,11 @@
 - [x] 清理过期文档 — 三份 human 版 Phase 文档已添加历史快照免责声明
 - [x] Rust 单元测试补齐 — 10 个测试全部通过
 - [x] Tauri 图标 — K 线蜡烛图标已替换（commit `f7a3eb5`）
+- [x] GitHub Actions 自动发布 — `v0.0.4` 已完成 Linux / macOS / Windows 三平台正式发布
+- [x] 版本统一 — 前端显示版本、package、Tauri、Cargo、tag 已统一到 `v0.0.4`
 
 ## 5. 下一步
 
-- 创建 GitHub Actions 自动编译工作流（用户明确要求）
-  - `.github/workflows/ci.yml` — PR 检查（pytest + npm test + cargo check）
-  - `.github/workflows/release.yml` — 打 tag 时触发跨平台 Tauri 构建
-  - 目标平台：Windows (NSIS)、macOS (DMG)、Linux (DEB/RPM/AppImage)
-  - TA-Lib 保留，在 CI 中为每个平台编译 C 库
-  - Python 引擎通过 PyInstaller 打包为 Tauri sidecar
+- 继续推进业务功能，而不是发布基础设施
+- 优先项可回到：分钟线按需实时获取、前端真实联动与缓存策略
+- 后续每次发版都必须继续遵守：先同步版本号，再推送对应 tag，再检查三平台 release 产物是否齐全
