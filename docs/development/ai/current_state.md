@@ -1,10 +1,10 @@
 # ETF 智能分析系统 - AI 当前状态指针
 
-**最后更新**: 2026-04-04 22:20 (UTC+8)
+**最后更新**: 2026-04-05 (UTC+8)
 
 ## 1. 当前阶段
 
-当前阶段为 **P2 真实链路收口已完成，处于提交 / 发布前最终验证完成状态**。
+当前阶段为 **全量库严格全量 + 标记隔离已完成，处于全量数据导入验证状态**。
 
 ## 2. 当前已完成内容
 
@@ -45,8 +45,20 @@
 - `Scorer` / `AnalysisService.strategy` / `risk_level` — 已从占位逻辑升级为真实计算与降级保护逻辑。
 - Rust `EngineManager` — 已支持自动启动、断连恢复、错误透传，前端无需手动先调用 `start_engine`。
 - Tauri 默认构建资源已收口：补齐 `src-tauri/icons/icon.png` 占位图标，默认 `cargo check` / `cargo test` 可运行。
-- 测试基线：前端 11 个测试文件，112 个测试用例全部通过；Python 端 49 个测试通过，2 个外部依赖测试按环境跳过；Rust 端 `cargo check` 通过，`cargo test` 通过（当前 0 个单元测试）。
+- 测试基线：前端 11 个测试文件，112 个测试用例全部通过；Python 端 65 个测试通过，2 个外部依赖测试按环境跳过；Rust 端 `cargo check` 通过，`cargo test` 通过。
 - TypeScript 类型检查 + Vite 构建通过。
+
+### 全量库严格全量 + 标记隔离 (2026-04-05)
+
+- `fund_info` 表新增 `has_market_data` 字段（DEFAULT 1）
+- `build_full_market_fund_records()` 根据新浪分类页的成交量/最新价预判标记
+- `sync_all.py` 跳过 `has_market_data=0` 的基金行情拉取，不中断导入
+- 新增 `get_all_funds_with_market_data()` 和 `update_has_market_data()` 数据库方法
+- 新增 `update_daily_quote_nav_and_premium()` 公开方法，替代 `_update_nav()` 私有调用
+- 提取 `classify_invest_type()` 和 `classify_t_plus()` 为模块级纯函数，消除私有方法调用
+- 约 22 只 LOF 被标记为 `has_market_data=0`（无场内交易行情）
+- 全量 1753 只基金入库，净值全量回填
+- 缺少净值快照的基金降级为 warning + 跳过，不再中断导入
 
 ## 3. 当前约束
 
@@ -57,9 +69,10 @@
 
 ## 4. 下一步
 
-- 当前主线功能已完成真实链路收口，下一步以提交、PR 或发布整理为主。
+- 全量库严格全量 + 标记隔离已完成，下一步执行全量数据导入验证。
 - 若继续推进，优先级建议为：
-- 1. 统一清理过期文档描述，避免 P0/P1 旧状态误导后续开发。
-- 2. 为 Rust `EngineManager` 补充真正的自动化单元测试，避免 `cargo test` 长期为 0 tests。
-- 3. 若进入发布准备，补齐 Tauri 正式图标资源，替换当前占位 `icon.png`。
-- 4. 根据用户决定执行提交、建 PR 或继续功能迭代。
+- 1. 运行 `sync_all.py` 全量导入，验证 1753 只基金入库统计
+- 2. 统一清理过期文档描述，避免 P0/P1 旧状态误导后续开发。
+- 3. 为 Rust `EngineManager` 补充真正的自动化单元测试，避免 `cargo test` 长期为 0 tests。
+- 4. 若进入发布准备，补齐 Tauri 正式图标资源，替换当前占位 `icon.png`。
+- 5. 根据用户决定执行提交、建 PR 或继续功能迭代。
