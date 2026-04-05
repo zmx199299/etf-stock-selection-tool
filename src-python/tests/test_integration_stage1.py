@@ -47,6 +47,9 @@ class MockDataSource(DataSource):
     def fetch_nav(self, code: str, start_date: str = None):
         return [{"date": "2023-10-01", "nav": 10.2}]
 
+    def fetch_minute_quotes(self, code: str, period: str):
+        return []
+
 
 @pytest.fixture
 def mock_env(tmp_path):

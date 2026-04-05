@@ -18,6 +18,12 @@ pub struct JsonRpcResponse {
     pub id: Option<u64>,
 }
 
+impl JsonRpcResponse {
+    fn touch_metadata(&self) {
+        let _ = (&self.jsonrpc, &self.id);
+    }
+}
+
 pub struct EngineManager {
     child: Option<Child>,
     req_id: u64,
@@ -109,6 +115,7 @@ impl EngineManager {
         }
 
         let res: JsonRpcResponse = serde_json::from_str(&line).map_err(|e| e.to_string())?;
+        res.touch_metadata();
 
         if let Some(err) = res.error {
             return Err(err.to_string());
