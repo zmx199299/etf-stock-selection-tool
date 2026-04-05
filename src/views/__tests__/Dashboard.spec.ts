@@ -1,6 +1,6 @@
 import { flushPromises, mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import Dashboard from '../Dashboard.vue'
 import { useColorModeStore } from '../../stores/colorMode'
@@ -8,6 +8,15 @@ import { useDisplaySettingsStore } from '../../stores/displaySettings'
 import { getSharedFundCards } from '../../utils/dashboardSignals'
 
 const pushMock = vi.fn()
+
+function createDeferred() {
+  let resolve!: () => void
+  const promise = new Promise<void>((resolver) => {
+    resolve = resolver
+  })
+
+  return { promise, resolve }
+}
 
 vi.mock('vue-router', () => ({
   useRouter: () => ({
@@ -19,7 +28,14 @@ describe('Dashboard', () => {
   beforeEach(() => {
     localStorage.clear()
     pushMock.mockReset()
+    vi.resetModules()
     setActivePinia(createPinia())
+  })
+
+  afterEach(() => {
+    vi.doUnmock('../../utils/startupSync')
+    vi.doUnmock('../../utils/dashboardSignals')
+    vi.clearAllMocks()
   })
 
   it('挂载后默认使用 cn 配色，并在切换到 intl 后同步更新首页关键语义颜色', async () => {
@@ -353,5 +369,128 @@ describe('Dashboard', () => {
     await flushPromises()
 
     expect(wrapper.findAll('.fund-card')).toHaveLength(6)
+  })
+
+  it('首页挂载时先完成启动同步，再读取共享基金卡片数据', async () => {
+    vi.resetModules()
+    const startupSync = createDeferred()
+    const ensureStartupSync = vi.fn().mockImplementation(() => startupSync.promise)
+    const loadSharedFundCards = vi.fn().mockResolvedValue([])
+
+    vi.doMock('../../utils/startupSync', () => ({
+      ensureStartupSync,
+      getStartupSyncState: () => ({ status: 'success', message: '' }),
+    }))
+
+    vi.doMock('../../utils/dashboardSignals', async () => {
+      const actual = await vi.importActual<typeof import('../../utils/dashboardSignals')>(
+        '../../utils/dashboardSignals',
+      )
+
+      return {
+        ...actual,
+        loadSharedFundCards,
+      }
+    })
+
+    const { default: SyncDashboard } = await import('../Dashboard.vue')
+    mount(SyncDashboard)
+
+    await Promise.resolve()
+
+    expect(ensureStartupSync).toHaveBeenCalledTimes(1)
+    expect(loadSharedFundCards).not.toHaveBeenCalled()
+
+    startupSync.resolve()
+    await flushPromises()
+
+    expect(loadSharedFundCards).toHaveBeenCalledTimes(1)
+  })
+
+  it('启动同步未完成前首页不会显示暂无交易信号空状态', async () => {
+    vi.resetModules()
+    const startupSync = createDeferred()
+    const ensureStartupSync = vi.fn().mockImplementation(() => startupSync.promise)
+    const loadSharedFundCards = vi.fn().mockResolvedValue([])
+
+    vi.doMock('../../utils/startupSync', () => ({
+      ensureStartupSync,
+      getStartupSyncState: () => ({ status: 'idle' }),
+    }))
+
+    vi.doMock('../../utils/dashboardSignals', async () => {
+      const actual = await vi.importActual<typeof import('../../utils/dashboardSignals')>(
+        '../../utils/dashboardSignals',
+      )
+
+      return {
+        ...actual,
+        loadSharedFundCards,
+      }
+    })
+
+    const { default: PendingDashboard } = await import('../Dashboard.vue')
+    const wrapper = mount(PendingDashboard)
+
+    await Promise.resolve()
+
+    expect(ensureStartupSync).toHaveBeenCalledTimes(1)
+    expect(loadSharedFundCards).not.toHaveBeenCalled()
+    expect(wrapper.text()).not.toContain('暂无交易信号')
+
+    startupSync.resolve()
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('暂无交易信号')
+  })
+
+  it('启动同步失败时首页仍显示失败提示和卡片数据', async () => {
+    vi.resetModules()
+
+    vi.doMock('../../utils/startupSync', () => ({
+      ensureStartupSync: vi.fn().mockResolvedValue(undefined),
+      getStartupSyncState: () => ({ status: 'error', message: '同步失败，当前显示本地旧数据' }),
+    }))
+
+    vi.doMock('../../utils/dashboardSignals', async () => {
+      const actual = await vi.importActual<typeof import('../../utils/dashboardSignals')>(
+        '../../utils/dashboardSignals',
+      )
+
+      return {
+        ...actual,
+        loadSharedFundCards: async () => [
+          {
+            code: '588888',
+            name: '失败后卡片',
+            tPlus: 'T+0',
+            currentPrice: 1,
+            changePct: 0.5,
+            buyPrice: null,
+            sellPrice: null,
+            stopLoss: null,
+            latestNav: 1,
+            navDate: '2026-03-30',
+            premiumRate: 0,
+            expectedProfit: null,
+            expectedProfitPct: null,
+            maxLoss: null,
+            maxLossPct: null,
+          },
+        ],
+      }
+    })
+
+    const { default: ErrorDashboard } = await import('../Dashboard.vue')
+    const wrapper = mount(ErrorDashboard)
+
+    await flushPromises()
+
+    expect(wrapper.get('[data-test="startup-sync-alert"]').text()).toContain('启动同步失败')
+    expect(wrapper.get('[data-test="startup-sync-alert"]').text()).toContain('核对当前数据状态')
+    expect(wrapper.get('[data-test="startup-sync-alert"]').text()).not.toContain('旧数据')
+    expect(wrapper.text()).toContain('失败后卡片')
+
+    vi.doUnmock('../../utils/dashboardSignals')
   })
 })

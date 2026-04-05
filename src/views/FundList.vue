@@ -41,6 +41,14 @@
         </div>
       </div>
 
+      <div
+        v-if="startupSyncMessage"
+        data-test="startup-sync-alert"
+        class="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 shadow-sm"
+      >
+        {{ startupSyncMessage }}
+      </div>
+
       <div class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
         <div class="overflow-x-auto">
           <table class="min-w-[1480px] w-full text-sm text-slate-700">
@@ -116,7 +124,7 @@
                   </button>
                 </td>
               </tr>
-              <tr v-if="filteredRows.length === 0">
+              <tr v-if="!isInitialLoading && filteredRows.length === 0">
                 <td data-test="fund-empty" colspan="15" class="px-4 py-12 text-center text-sm text-slate-500">
                   没有匹配的基金
                 </td>
@@ -134,6 +142,7 @@ import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 
 import { useColorModeStore } from '../stores/colorMode'
+import { ensureStartupSync, getStartupSyncState } from '../utils/startupSync'
 import { buildFundRows, filterFundRows, type FundListItem } from '../utils/fundList'
 import {
   getDirectionPalette,
@@ -213,6 +222,17 @@ const mockFunds: FundListItem[] = [
 
 const keyword = ref('')
 const funds = ref<FundListItem[]>(import.meta.env.MODE === 'test' ? [...mockFunds] : [])
+const startupSyncMessage = ref('')
+const isInitialLoading = ref(import.meta.env.MODE !== 'test')
+
+function toStartupSyncAlertMessage() {
+  const startupSyncState = getStartupSyncState()
+  if (startupSyncState.status !== 'error') {
+    return ''
+  }
+
+  return '启动同步失败，请注意核对当前数据状态'
+}
 
 const rows = computed(() => buildFundRows(funds.value))
 const filteredRows = computed(() => filterFundRows(rows.value, keyword.value))
@@ -262,12 +282,14 @@ function openXueqiu(code: string) {
 }
 
 async function fetchFunds() {
-  if (import.meta.env.MODE === 'test' || import.meta.env.DEV) {
-    funds.value = mockFunds
-    return
-  }
-
   try {
+    if (import.meta.env.MODE === 'test' || import.meta.env.DEV) {
+      funds.value = mockFunds
+      return
+    }
+
+    await ensureStartupSync()
+    startupSyncMessage.value = toStartupSyncAlertMessage()
     const { invoke } = await import('@tauri-apps/api/core')
     const response = await invoke<FundListItem[]>('invoke_engine', {
       method: 'get_fund_list',
@@ -277,6 +299,8 @@ async function fetchFunds() {
     funds.value = Array.isArray(response) ? response : mockFunds
   } catch {
     funds.value = mockFunds
+  } finally {
+    isInitialLoading.value = false
   }
 }
 

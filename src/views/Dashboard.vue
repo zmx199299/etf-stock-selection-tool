@@ -34,6 +34,14 @@
       </header>
 
       <div
+        v-if="startupSyncMessage"
+        data-test="startup-sync-alert"
+        class="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 shadow-sm"
+      >
+        {{ startupSyncMessage }}
+      </div>
+
+      <div
         data-test="dashboard-card-grid"
         class="grid gap-6 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-6"
       >
@@ -76,7 +84,7 @@
       </div>
 
       <!-- 空状态 -->
-      <div v-if="filteredSignals.length === 0" class="text-center py-20 text-gray-300 text-sm italic">
+      <div v-if="!isInitialLoading && filteredSignals.length === 0" class="text-center py-20 text-gray-300 text-sm italic">
         暂无交易信号
       </div>
     </div>
@@ -89,6 +97,7 @@ import { useRouter } from 'vue-router'
 
 import { useColorModeStore } from '../stores/colorMode'
 import { useDisplaySettingsStore } from '../stores/displaySettings'
+import { ensureStartupSync, getStartupSyncState } from '../utils/startupSync'
 import {
   loadSharedFundCards,
   type SharedFundCard,
@@ -100,7 +109,18 @@ const colorMode = useColorModeStore()
 const displaySettings = useDisplaySettingsStore()
 
 const signals = ref<SharedFundCard[]>([])
+const startupSyncMessage = ref('')
 const activeTab = ref<'all' | 'T+0' | 'T+1'>('all')
+const isInitialLoading = ref(true)
+
+function toStartupSyncAlertMessage() {
+  const startupSyncState = getStartupSyncState()
+  if (startupSyncState.status !== 'error') {
+    return ''
+  }
+
+  return '启动同步失败，请注意核对当前数据状态'
+}
 
 const filteredSignals = computed(() => {
   if (activeTab.value === 'all') return signals.value
@@ -147,7 +167,13 @@ function goToAnalysis(code: string) {
 }
 
 async function fetchSignals() {
-  signals.value = (await loadSharedFundCards()).slice(0, displaySettings.cardCount)
+  try {
+    await ensureStartupSync()
+    startupSyncMessage.value = toStartupSyncAlertMessage()
+    signals.value = (await loadSharedFundCards()).slice(0, displaySettings.cardCount)
+  } finally {
+    isInitialLoading.value = false
+  }
 }
 
 onMounted(() => {

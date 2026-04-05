@@ -1,12 +1,21 @@
-import { mount } from '@vue/test-utils'
+import { flushPromises, mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import FundList from '../FundList.vue'
 import { COLOR_MODE_STORAGE_KEY, useColorModeStore } from '../../stores/colorMode'
 
 const pushMock = vi.fn()
 const openMock = vi.fn()
+
+function createDeferred() {
+  let resolve!: () => void
+  const promise = new Promise<void>((resolver) => {
+    resolve = resolver
+  })
+
+  return { promise, resolve }
+}
 
 vi.mock('vue-router', () => ({
   useRouter: () => ({
@@ -19,8 +28,18 @@ describe('FundList', () => {
     localStorage.clear()
     pushMock.mockReset()
     openMock.mockReset()
+    vi.resetModules()
+    vi.unstubAllEnvs()
     setActivePinia(createPinia())
     vi.stubGlobal('open', openMock)
+  })
+
+  afterEach(() => {
+    vi.doUnmock('../../utils/startupSync')
+    vi.doUnmock('@tauri-apps/api/core')
+    vi.unstubAllEnvs()
+    vi.unstubAllGlobals()
+    vi.clearAllMocks()
   })
 
   it('搜索创业板后只显示匹配基金', async () => {
@@ -131,5 +150,111 @@ describe('FundList', () => {
     await wrapper.get('[data-test="fund-search"]').setValue('不存在的关键词')
 
     expect(wrapper.get('[data-test="fund-empty"]').text()).toContain('没有匹配的基金')
+  })
+
+  it('第二页挂载时先完成启动同步，再读取基金列表', async () => {
+    vi.resetModules()
+    vi.stubEnv('MODE', 'production')
+    vi.stubEnv('DEV', false)
+
+    const startupSync = createDeferred()
+    const ensureStartupSync = vi.fn().mockImplementation(() => startupSync.promise)
+    const invoke = vi.fn().mockResolvedValue([])
+
+    vi.doMock('../../utils/startupSync', () => ({
+      ensureStartupSync,
+      getStartupSyncState: () => ({ status: 'success', message: '' }),
+    }))
+
+    vi.doMock('@tauri-apps/api/core', () => ({ invoke }))
+
+    const { default: SyncFundList } = await import('../FundList.vue')
+    mount(SyncFundList)
+
+    await flushPromises()
+
+    expect(ensureStartupSync).toHaveBeenCalledTimes(1)
+    expect(invoke).not.toHaveBeenCalled()
+
+    startupSync.resolve()
+    await flushPromises()
+
+    expect(invoke).toHaveBeenCalledWith('invoke_engine', {
+      method: 'get_fund_list',
+      params: {},
+    })
+  })
+
+  it('启动同步未完成前第二页不会显示没有匹配的基金空状态', async () => {
+    vi.resetModules()
+    vi.stubEnv('MODE', 'production')
+    vi.stubEnv('DEV', false)
+
+    const startupSync = createDeferred()
+    const ensureStartupSync = vi.fn().mockImplementation(() => startupSync.promise)
+    const invoke = vi.fn().mockResolvedValue([])
+
+    vi.doMock('../../utils/startupSync', () => ({
+      ensureStartupSync,
+      getStartupSyncState: () => ({ status: 'idle' }),
+    }))
+
+    vi.doMock('@tauri-apps/api/core', () => ({ invoke }))
+
+    const { default: PendingFundList } = await import('../FundList.vue')
+    const wrapper = mount(PendingFundList)
+
+    await Promise.resolve()
+
+    expect(ensureStartupSync).toHaveBeenCalledTimes(1)
+    expect(invoke).not.toHaveBeenCalled()
+    expect(wrapper.text()).not.toContain('没有匹配的基金')
+
+    startupSync.resolve()
+    await flushPromises()
+
+    expect(wrapper.get('[data-test="fund-empty"]').text()).toContain('没有匹配的基金')
+  })
+
+  it('启动同步失败时第二页仍显示失败提示和基金列表', async () => {
+    vi.resetModules()
+    vi.stubEnv('MODE', 'production')
+    vi.stubEnv('DEV', false)
+
+    const invoke = vi.fn().mockResolvedValue([
+      {
+        code: '512100',
+        name: '失败后基金',
+        prevClose: 1,
+        open: 1,
+        close: 1.01,
+        high: 1.02,
+        low: 0.99,
+        volatility: 0.03,
+        macd: { signal: 'bullish', value: '金叉' },
+        rsi: { signal: 'neutral', value: '50' },
+        boll: { signal: 'neutral', value: '中轨' },
+        ma5: { signal: 'bullish', value: '上穿' },
+        ma20: { signal: 'neutral', value: '粘合' },
+        score: 7,
+      },
+    ])
+
+    vi.doMock('../../utils/startupSync', () => ({
+      ensureStartupSync: vi.fn().mockResolvedValue(undefined),
+      getStartupSyncState: () => ({ status: 'error', message: '同步失败，当前显示本地旧数据' }),
+    }))
+
+    vi.doMock('@tauri-apps/api/core', () => ({ invoke }))
+
+    const { default: ErrorFundList } = await import('../FundList.vue')
+    const wrapper = mount(ErrorFundList)
+
+    await flushPromises()
+
+    expect(wrapper.get('[data-test="startup-sync-alert"]').text()).toContain('启动同步失败')
+    expect(wrapper.get('[data-test="startup-sync-alert"]').text()).toContain('核对当前数据状态')
+    expect(wrapper.get('[data-test="startup-sync-alert"]').text()).not.toContain('旧数据')
+    expect(wrapper.text()).toContain('失败后基金')
   })
 })

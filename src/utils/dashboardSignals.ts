@@ -1,3 +1,5 @@
+import { ensureStartupSync } from './startupSync'
+
 export interface DashboardSignal {
   code: string
   name: string
@@ -90,6 +92,7 @@ export async function loadSharedFundCards(): Promise<SharedFundCard[]> {
   }
 
   try {
+    await ensureStartupSync()
     const { invoke } = await import('@tauri-apps/api/core')
     const result = await invoke<DashboardSignal[]>('invoke_engine', {
       method: 'get_dashboard_signals',

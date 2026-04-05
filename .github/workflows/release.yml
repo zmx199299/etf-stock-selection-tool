@@ -211,5 +211,9 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           Get-ChildItem "src-tauri\target\${{ matrix.platform.target }}\release\bundle\msi\*.msi" | ForEach-Object {
-            gh release upload "${{ github.ref_name }}" $_.FullName --clobber
+            $renamedPath = Join-Path $_.DirectoryName ($_.Name.Replace('_en-US', ''))
+            if ($renamedPath -ne $_.FullName) {
+              Copy-Item $_.FullName $renamedPath
+            }
+            gh release upload "${{ github.ref_name }}" $renamedPath --clobber
           }
