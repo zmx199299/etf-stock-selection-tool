@@ -11,3 +11,4 @@ dist/
 .superpowers/
 .worktrees/
 src-tauri/gen/
+src-tauri/binaries/
