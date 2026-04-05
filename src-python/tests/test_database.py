@@ -108,3 +108,16 @@ def test_update_has_market_data(db):
     db.update_has_market_data("160137", 0)
     result = db.get_fund_info("160137")
     assert result["has_market_data"] == 0
+
+def test_update_has_market_data_rejects_invalid_values(db):
+    fund = {
+        "code": "160137", "name": "互联基金",
+        "fund_type": "LOF", "invest_type": "指数型",
+        "t_plus": "T+1", "list_date": "",
+        "is_excluded": 0, "has_market_data": 1,
+    }
+    db.upsert_fund_info([fund])
+    with pytest.raises(ValueError, match="has_market_data must be 0 or 1"):
+        db.update_has_market_data("160137", 2)
+    with pytest.raises(ValueError, match="has_market_data must be 0 or 1"):
+        db.update_has_market_data("160137", -1)

@@ -191,6 +191,8 @@ class Database:
         self.conn.commit()
 
     def update_has_market_data(self, code: str, value: int):
+        if value not in (0, 1):
+            raise ValueError(f"has_market_data must be 0 or 1, got {value}")
         c = self.conn.cursor()
         c.execute("UPDATE fund_info SET has_market_data=? WHERE code=?", (value, code))
         self.conn.commit()
