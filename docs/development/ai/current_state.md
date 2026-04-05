@@ -1,10 +1,10 @@
 # ETF 智能分析系统 - AI 当前状态指针
 
-**最后更新**: 2026-04-05 23:49 (UTC+8)
+**最后更新**: 2026-04-06 00:59 (UTC+8)
 
 ## 1. 当前阶段
 
-当前阶段为 **GitHub 三平台自动发布已打通并完成 `v0.0.4` 正式发布**。Linux（RPM/DEB/AppImage）、macOS（Intel/Apple Silicon DMG）和 Windows（MSI）均已成功出包。
+当前阶段为 **GitHub 三平台自动发布已打通，并完成 `v0.0.5` 正式发布**。应用现在会在启动时先执行一次数据同步，Windows 安装包文件名也已去掉 `en-US` 后缀。
 
 ## 2. 当前已完成内容
 
@@ -48,28 +48,34 @@
 - 测试基线：前端 11 个测试文件，112 个测试用例全部通过；Python 端 **65 个测试通过**（2 个外部依赖测试按环境跳过）；Rust 端 `cargo test` **10 个测试全部通过**（从 5 个新增到 10 个，覆盖 JSON-RPC 请求序列化、响应解析、错误传播、req_id 递增、复杂参数往返）。
 - TypeScript 类型检查 + Vite 构建通过。
 
-### 发布与版本统一 (2026-04-05 深夜)
+### 发布与版本统一 (2026-04-05 深夜 / 2026-04-06 凌晨)
 
-- 发布版本已统一到 `v0.0.4`
+- 发布版本已统一到 `v0.0.5`
 - 已同步更新：
   - `package.json`
   - `package-lock.json`
   - `src-tauri/tauri.conf.json`
   - `src-tauri/Cargo.toml`
   - `src-tauri/Cargo.lock`
-- 系统设置页版本显示继续直接读取 `package.json`，当前展示为 `v0.0.4 预览版`
+- 系统设置页版本显示继续直接读取 `package.json`，当前展示为 `v0.0.5 预览版`
 - Windows 打包缺失图标问题已修复：
   - 新增 `src-tauri/icons/icon.ico`
   - `bundle.icon` 已包含 `icons/icon.ico`
 - 新增版本一致性保护测试，校验：
   - `package.json` / `package-lock.json` / `tauri.conf.json` / `Cargo.toml` 版本一致
   - Windows bundler 所需 `icons/icon.ico` 已登记到 Tauri 配置
-- `Release` workflow run `24004791161` 已全部成功
-- 正式发布地址：`https://github.com/zmx199299/etf-stock-selection-tool/releases/tag/v0.0.4`
+- 启动同步能力已接入：
+  - `src/main.ts` 会在挂载 Vue 应用前先执行 `ensureStartupSync()`
+  - Dashboard / FundList 页面保留页面级兜底
+  - 同步失败会提示“启动同步失败，请注意核对当前数据状态”
+  - 同步进行中不会误显示空状态
+- Windows MSI release 上传前会去掉 `_en-US` 后缀
+- `Release` workflow run `24006001647` 已全部成功
+- 正式发布地址：`https://github.com/zmx199299/etf-stock-selection-tool/releases/tag/v0.0.5`
 - 当前发布产物：
   - Linux：RPM / DEB / AppImage
   - macOS：x64 DMG / aarch64 DMG
-  - Windows：x64 MSI
+  - Windows：x64 MSI（文件名已不含 `en-US`）
 
 ### 全量库严格全量 + 标记隔离 (2026-04-05 下午)
 
@@ -134,8 +140,10 @@
 - [x] 清理过期文档 — 三份 human 版 Phase 文档已添加历史快照免责声明
 - [x] Rust 单元测试补齐 — 10 个测试全部通过
 - [x] Tauri 图标 — K 线蜡烛图标已替换（commit `f7a3eb5`）
-- [x] GitHub Actions 自动发布 — `v0.0.4` 已完成 Linux / macOS / Windows 三平台正式发布
-- [x] 版本统一 — 前端显示版本、package、Tauri、Cargo、tag 已统一到 `v0.0.4`
+- [x] GitHub Actions 自动发布 — `v0.0.5` 已完成 Linux / macOS / Windows 三平台正式发布
+- [x] 版本统一 — 前端显示版本、package、Tauri、Cargo、tag 已统一到 `v0.0.5`
+- [x] 启动同步 — 应用挂载前先执行一次 `sync_data`
+- [x] Windows 安装包命名 — Release 中的 MSI 已去掉 `_en-US`
 
 ## 5. 下一步
 
