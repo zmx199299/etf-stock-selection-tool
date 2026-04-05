@@ -24,3 +24,15 @@ class DataSource(ABC):
         返回: [{"date","nav"}]
         """
         ...
+
+    @abstractmethod
+    def fetch_minute_quotes(self, code: str, period: str) -> list[dict]:
+        """获取指定基金的分钟线行情
+        Args:
+            code: 基金代码
+            period: 周期标识 '1', '5', '60'
+        Returns:
+            [{"datetime": "YYYY-MM-DD HH:MM:SS", "open": float, "close": float,
+              "high": float, "low": float, "volume": float, "amount": float}]
+        """
+        ...
