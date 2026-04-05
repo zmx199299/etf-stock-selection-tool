@@ -1,0 +1,190 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+jobs:
+  create-release:
+    name: Create GitHub Release
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Create release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "${{ github.ref_name }}" \
+            --repo "$GITHUB_REPOSITORY" \
+            --title "${{ github.ref_name }}" \
+            --generate-notes \
+            --draft
+
+  build-tauri:
+    name: Tauri Build (${{ matrix.platform.os }} - ${{ matrix.platform.target }})
+    needs: create-release
+    needs: [create-release]
+    strategy:
+      fail-fast: false
+      matrix:
+        platform:
+          # Linux x86_64 — DEB + RPM + AppImage
+          - os: ubuntu-22.04
+            target: x86_64-unknown-linux-gnu
+            artifact_pattern: "src-tauri/target/release/bundle/{deb,rpm,appimage}/**/*"
+          # macOS Intel
+          - os: macos-14
+            target: x86_64-apple-darwin
+            artifact_pattern: "src-tauri/target/release/bundle/dmg/*.dmg"
+          # macOS Apple Silicon
+          - os: macos-14
+            target: aarch64-apple-darwin
+            artifact_pattern: "src-tauri/target/release/bundle/dmg/*.dmg"
+          # Windows x86_64
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            artifact_pattern: "src-tauri/target/release/bundle/msi/*.msi"
+
+    runs-on: ${{ matrix.platform.os }}
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: "npm"
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.platform.target }}
+
+      - name: Rust cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: "src-tauri -> target"
+          key: ${{ matrix.platform.target }}
+
+      # ── Platform-specific system dependencies ──
+
+      - name: Install Linux system dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev build-essential curl wget file \
+            libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev \
+            rpm fakeroot dpkg libfuse2
+
+      - name: Install TA-Lib C library (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          wget https://github.com/ta-lib/ta-lib/releases/download/v0.6.4/ta-lib-0.6.4-src.tar.gz
+          tar -xzf ta-lib-0.6.4-src.tar.gz
+          cd ta-lib-0.6.4/
+          ./configure --prefix=/usr
+          make
+          sudo make install
+          cd ..
+          rm -rf ta-lib-0.6.4 ta-lib-0.6.4-src.tar.gz
+
+      - name: Install TA-Lib C library (macOS)
+        if: runner.os == 'macOS'
+        run: brew install ta-lib
+
+      # TA-Lib on Windows: use pre-built wheel from PyPI
+      # The ta-lib Python package >= 0.6.4 bundles the C library, so no system install needed
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: "pip"
+
+      - name: Install Python dependencies
+        run: |
+          python -m venv .venv
+          .venv/bin/pip install -r src-python/requirements.txt pyinstaller
+
+      - name: Build Python engine sidecar (Linux/macOS)
+        if: runner.os != 'Windows'
+        run: |
+          .venv/bin/pyinstaller src-python/engine.spec --clean
+          TARGET=$(rustc --print host-tuple)
+          mkdir -p src-tauri/binaries
+          cp dist/engine "src-tauri/binaries/engine-${TARGET}"
+
+      - name: Build Python engine sidecar (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          .venv\Scripts\pyinstaller src-python\engine.spec --clean
+          $target = rustc --print host-tuple
+          New-Item -ItemType Directory -Force -Path src-tauri\binaries
+          Copy-Item dist\engine.exe "src-tauri\binaries\engine-${target}.exe"
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      - name: Build Tauri app
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          projectPath: src-tauri
+          args: --target ${{ matrix.platform.target }}
+
+      # ── Upload artifacts to GitHub Release ──
+
+      - name: Upload Linux DEB packages
+        if: runner.os == 'Linux'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          for f in src-tauri/target/${{ matrix.platform.target }}/release/bundle/deb/*.deb; do
+            gh release upload "${{ github.ref_name }}" "$f" --clobber
+          done
+
+      - name: Upload Linux RPM packages
+        if: runner.os == 'Linux'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          for f in src-tauri/target/${{ matrix.platform.target }}/release/bundle/rpm/*.rpm; do
+            gh release upload "${{ github.ref_name }}" "$f" --clobber
+          done
+
+      - name: Upload Linux AppImage
+        if: runner.os == 'Linux'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          for f in src-tauri/target/${{ matrix.platform.target }}/release/bundle/appimage/*.AppImage; do
+            gh release upload "${{ github.ref_name }}" "$f" --clobber
+          done
+
+      - name: Upload macOS DMG
+        if: runner.os == 'macOS'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          for f in src-tauri/target/${{ matrix.platform.target }}/release/bundle/dmg/*.dmg; do
+            gh release upload "${{ github.ref_name }}" "$f" --clobber
+          done
+
+      - name: Upload Windows MSI
+        if: runner.os == 'Windows'
+        shell: pwsh
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          Get-ChildItem "src-tauri\target\${{ matrix.platform.target }}\release\bundle\msi\*.msi" | ForEach-Object {
+            gh release upload "${{ github.ref_name }}" $_.FullName --clobber
+          }
