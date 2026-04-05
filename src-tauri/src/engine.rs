@@ -1,6 +1,7 @@
 use serde::{Deserialize, Serialize};
 use std::io::{BufRead, BufReader, Write};
 use std::process::{Child, Command, Stdio};
+use tauri::{path::BaseDirectory, Manager};
 
 #[derive(Serialize)]
 pub struct JsonRpcRequest {
@@ -37,14 +38,34 @@ impl EngineManager {
         }
     }
 
-    pub fn start(&mut self, is_prod: bool) -> Result<(), String> {
+    pub fn start(
+        &mut self,
+        is_prod: bool,
+        app_handle: Option<&tauri::AppHandle>,
+    ) -> Result<(), String> {
         if self.child.is_some() {
             return Ok(());
         }
 
         let mut cmd = if is_prod {
-            // In production, run the PyInstaller bundled executable
-            Command::new("binaries/engine")
+            // In production, resolve the packaged sidecar path produced by Tauri bundling.
+            let app_handle = app_handle.ok_or("Missing app handle in production mode")?;
+            let target = std::env::consts::ARCH;
+            let os = std::env::consts::OS;
+            let triple = match (os, target) {
+                ("linux", "x86_64") => "x86_64-unknown-linux-gnu",
+                ("macos", "x86_64") => "x86_64-apple-darwin",
+                ("macos", "aarch64") => "aarch64-apple-darwin",
+                ("windows", "x86_64") => "x86_64-pc-windows-msvc",
+                _ => return Err(format!("Unsupported platform: {os}-{target}")),
+            };
+
+            let sidecar_path = app_handle
+                .path()
+                .resolve(format!("binaries/engine-{triple}"), BaseDirectory::Resource)
+                .map_err(|e| format!("Failed to resolve sidecar path: {e}"))?;
+
+            Command::new(sidecar_path)
         } else {
             // In development, run python directly
             // Ensure we use the venv python if available, else fallback to python3
@@ -150,7 +171,7 @@ mod tests {
     fn test_start_with_invalid_path_fails() {
         let mut manager = EngineManager::new();
         // Try to start with a non-existent binary
-        let result = manager.start(true); // is_prod = true looks for binaries/engine
+        let result = manager.start(true, None); // missing app handle in prod should fail
         assert!(result.is_err());
     }
 

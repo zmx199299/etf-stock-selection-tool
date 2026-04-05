@@ -36,7 +36,7 @@ jobs:
             target: x86_64-unknown-linux-gnu
             artifact_pattern: "src-tauri/target/release/bundle/{deb,rpm,appimage}/**/*"
           # macOS Intel
-          - os: macos-14
+          - os: macos-13
             target: x86_64-apple-darwin
             artifact_pattern: "src-tauri/target/release/bundle/dmg/*.dmg"
           # macOS Apple Silicon
@@ -108,26 +108,32 @@ jobs:
           cache: "pip"
 
       - name: Install Python dependencies
+        if: runner.os != 'Windows'
         run: |
           python -m venv .venv
           .venv/bin/pip install -r src-python/requirements.txt pyinstaller
 
+      - name: Install Python dependencies (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          python -m venv .venv
+          .venv\Scripts\pip install -r src-python/requirements.txt pyinstaller
+
       - name: Build Python engine sidecar (Linux/macOS)
         if: runner.os != 'Windows'
         run: |
-          .venv/bin/pyinstaller src-python/engine.spec --clean
-          TARGET=$(rustc --print host-tuple)
+          .venv/bin/pyinstaller src-python/main.py --onefile --name engine --clean
           mkdir -p src-tauri/binaries
-          cp dist/engine "src-tauri/binaries/engine-${TARGET}"
+          cp dist/engine "src-tauri/binaries/engine-${{ matrix.platform.target }}"
 
       - name: Build Python engine sidecar (Windows)
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
-          .venv\Scripts\pyinstaller src-python\engine.spec --clean
-          $target = rustc --print host-tuple
+          .venv\Scripts\pyinstaller src-python\main.py --onefile --name engine --clean
           New-Item -ItemType Directory -Force -Path src-tauri\binaries
-          Copy-Item dist\engine.exe "src-tauri\binaries\engine-${target}.exe"
+          Copy-Item dist\engine.exe "src-tauri\binaries\engine-${{ matrix.platform.target }}.exe"
 
       - name: Install frontend dependencies
         run: npm ci
@@ -140,25 +146,19 @@ jobs:
 
       - name: Build Tauri app (Linux)
         if: runner.os == 'Linux'
-        working-directory: src-tauri
         run: |
-          cargo build --release --target ${{ matrix.platform.target }}
-          cargo build --release --target ${{ matrix.platform.target }} --bundles deb,rpm,appimage
+          npm run tauri -- build --ci --target ${{ matrix.platform.target }} --bundles deb,rpm,appimage
 
       - name: Build Tauri app (macOS)
         if: runner.os == 'macOS'
-        working-directory: src-tauri
         run: |
-          cargo build --release --target ${{ matrix.platform.target }}
-          cargo build --release --target ${{ matrix.platform.target }} --bundles dmg
+          npm run tauri -- build --ci --target ${{ matrix.platform.target }} --bundles dmg --no-sign
 
       - name: Build Tauri app (Windows)
         if: runner.os == 'Windows'
         shell: pwsh
-        working-directory: src-tauri
         run: |
-          cargo build --release --target ${{ matrix.platform.target }}
-          cargo build --release --target ${{ matrix.platform.target }} --bundles msi
+          npm run tauri -- build --ci --target ${{ matrix.platform.target }} --bundles msi --no-sign
 
       # ── Upload artifacts to GitHub Release ──
 

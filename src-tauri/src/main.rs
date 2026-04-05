@@ -3,18 +3,18 @@
 mod engine;
 use engine::EngineManager;
 use std::sync::Mutex;
-use tauri::State;
+use tauri::{AppHandle, State};
 
 struct AppState {
     engine: Mutex<EngineManager>,
 }
 
 #[tauri::command]
-fn start_engine(state: State<AppState>) -> Result<String, String> {
+fn start_engine(state: State<AppState>, app_handle: AppHandle) -> Result<String, String> {
     let mut engine = state.engine.lock().map_err(|e| e.to_string())?;
     // Note: In real app, determine is_prod dynamically (e.g., via #[cfg(debug_assertions)])
     let is_prod = !cfg!(debug_assertions);
-    engine.start(is_prod)?;
+    engine.start(is_prod, Some(&app_handle))?;
     Ok("Engine started".to_string())
 }
 
