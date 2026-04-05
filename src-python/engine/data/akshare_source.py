@@ -122,3 +122,46 @@ class AkshareSource(DataSource):
 
     def _classify_t_plus(self, name: str) -> str:
         return classify_t_plus(name)
+
+    def fetch_minute_quotes(self, code: str, period: str) -> list[dict]:
+        """获取指定基金的分钟线行情
+        Args:
+            code: 基金代码
+            period: 周期标识 '1', '5', '60'
+        Returns:
+            [{"datetime": "YYYY-MM-DD HH:MM:SS", "open": float, "close": float,
+              "high": float, "low": float, "volume": float, "amount": float}]
+        """
+        if period not in ('1', '5', '60'):
+            return []
+
+        try:
+            df = ak.fund_etf_hist_min_em(symbol=code, period=period)
+        except Exception:
+            try:
+                df = ak.fund_lof_hist_min_em(symbol=code, period=period)
+            except Exception:
+                return []
+
+        if df.empty:
+            return []
+
+        results = []
+        for _, row in df.iterrows():
+            time_str = str(row.get("时间", ""))
+            if ' ' in time_str:
+                datetime_str = time_str[:19]
+            else:
+                datetime_str = time_str
+
+            results.append({
+                "datetime": datetime_str,
+                "open": float(row.get("开盘", 0)),
+                "close": float(row.get("收盘", 0)),
+                "high": float(row.get("最高", 0)),
+                "low": float(row.get("最低", 0)),
+                "volume": float(row.get("成交量", 0)),
+                "amount": float(row.get("成交额", 0)),
+            })
+
+        return results
