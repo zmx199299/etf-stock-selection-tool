@@ -1,10 +1,10 @@
 # ETF 智能分析系统 - AI 当前状态指针
 
-**最后更新**: 2026-04-05 (UTC+8)
+**最后更新**: 2026-04-05 22:00 (UTC+8)
 
 ## 1. 当前阶段
 
-当前阶段为 **全量库严格全量 + 标记隔离已完成，处于全量数据导入验证状态**。
+当前阶段为 **全量库严格全量 + 标记隔离已完成**，7 个提交，65 个 Python 测试全绿，前端构建通过。下一步可开始 GitHub Actions 自动编译工作流。
 
 ## 2. 当前已完成内容
 
@@ -44,21 +44,58 @@
 - `AnalysisService` — 已支持 Analysis 页面九周期真实数据：`intraday`、`day`、`m5`、`m60`、`m120`、`week`、`month`、`quarter`、`year`。
 - `Scorer` / `AnalysisService.strategy` / `risk_level` — 已从占位逻辑升级为真实计算与降级保护逻辑。
 - Rust `EngineManager` — 已支持自动启动、断连恢复、错误透传，前端无需手动先调用 `start_engine`。
-- Tauri 默认构建资源已收口：补齐 `src-tauri/icons/icon.png` 占位图标，默认 `cargo check` / `cargo test` 可运行。
-- 测试基线：前端 11 个测试文件，112 个测试用例全部通过；Python 端 65 个测试通过，2 个外部依赖测试按环境跳过；Rust 端 `cargo check` 通过，`cargo test` 通过。
+- Tauri 图标资源已收口：`src-tauri/icons/` 下包含 16x16 至 512x512 多尺寸 PNG 及 `icon.png`，K 线蜡烛图标（commit `f7a3eb5`）。
+- 测试基线：前端 11 个测试文件，112 个测试用例全部通过；Python 端 **65 个测试通过**（2 个外部依赖测试按环境跳过）；Rust 端 `cargo test` **10 个测试全部通过**（从 5 个新增到 10 个，覆盖 JSON-RPC 请求序列化、响应解析、错误传播、req_id 递增、复杂参数往返）。
 - TypeScript 类型检查 + Vite 构建通过。
 
-### 全量库严格全量 + 标记隔离 (2026-04-05)
+### 全量库严格全量 + 标记隔离 (2026-04-05 下午)
 
-- `fund_info` 表新增 `has_market_data` 字段（DEFAULT 1）
-- `build_full_market_fund_records()` 根据新浪分类页的成交量/最新价预判标记
-- `sync_all.py` 跳过 `has_market_data=0` 的基金行情拉取，不中断导入
-- 新增 `get_all_funds_with_market_data()` 和 `update_has_market_data()` 数据库方法
-- 新增 `update_daily_quote_nav_and_premium()` 公开方法，替代 `_update_nav()` 私有调用
-- 提取 `classify_invest_type()` 和 `classify_t_plus()` 为模块级纯函数，消除私有方法调用
-- 约 22 只 LOF 被标记为 `has_market_data=0`（无场内交易行情）
-- 全量 1753 只基金入库，净值全量回填
-- 缺少净值快照的基金降级为 warning + 跳过，不再中断导入
+**问题**：约 22 只 LOF 在新浪分类页 `最新价=0.0`、`成交量=0`，无场内交易行情。`sync_all.py` 遇到空行情即中断导入。
+
+**方案**：严格全量 + 标记隔离（用户选择方案 B）
+
+**实现**（7 个提交）：
+
+| 提交 | 说明 |
+|------|------|
+| `b96605a` | 数据库层：`has_market_data INTEGER DEFAULT 1` + `get_all_funds_with_market_data()` + `update_has_market_data()` + 输入验证 + `update_daily_quote_nav_and_premium()` |
+| `600981e` | 种子同步层：根据新浪分类页成交量/最新价标记 `has_market_data` |
+| `bd1715d` | 重构：提取 `classify_invest_type()` 和 `classify_t_plus()` 为模块级纯函数 |
+| `bf3dbe7` | 同步脚本：跳过无行情基金 + 报告统计 |
+| `7f7ea0d` | 修复：封装 `_update_nav` 为公开方法 + 净值缺失降级为 warning |
+| `6a99bab` | 修复：`DataSyncPipeline` 改用 `get_all_funds_with_market_data()` |
+| `43860d0` | 文档：更新 AI 状态 |
+
+**代码质量审阅发现并修复的问题**：
+- 私有方法调用 `_classify_invest_type()` / `_classify_t_plus()` → 提取为模块级纯函数
+- 裸 SQL 直接操作 `db.conn` → 封装为 `update_daily_quote_nav_and_premium()`
+- `_update_nav()` 私有方法被脚本层调用 → 封装为公开方法
+- 缺少净值快照抛 `RuntimeError` → 降级为 warning + continue
+- `DataSyncPipeline` 不尊重 `has_market_data` → 改用 `get_all_funds_with_market_data()`
+
+**新增测试**：6 个（database 3 个、seed_sync 1 个、sync_all 2 个）
+**测试总数**：49 → 65 passed, 2 skipped
+
+**规格文档**：`docs/superpowers/specs/2026-04-05-full-market-db-has-market-data-design.md`
+**实施计划**：`docs/superpowers/plans/2026-04-05-full-market-has-market-data-plan.md`
+
+### 文档清理完成 (2026-04-05)
+
+- `docs/development/human/01_phase1_python_engine.md` — 已添加历史快照免责声明
+- `docs/development/human/02_phase2_rust_integration.md` — 已添加历史快照免责声明
+- `docs/development/human/03_phase3_frontend.md` — 已添加历史快照免责声明
+- `docs/development/ai/` 下四份历史快照文件已有免责声明，维持现状
+
+### Rust 单元测试补齐 (2026-04-05)
+
+- 从 5 个测试增加到 10 个测试，全部通过
+- 新增测试：
+  - `test_invoke_with_echo_process` — 正常 JSON-RPC 请求-响应解析
+  - `test_invoke_with_error_response` — Python 端错误正确透传
+  - `test_invoke_with_null_result` — result 为 null 时返回错误
+  - `test_req_id_increments` — 每次 invoke 后 req_id 递增
+  - `test_invoke_with_complex_params` — 复杂嵌套 JSON 参数正确往返
+- 清理了 `engine.rs` 中未使用的导入（`ChildStdin`、`ChildStdout`、`Arc`、`Mutex`）
 
 ## 3. 当前约束
 
@@ -67,12 +104,19 @@
 - 后续页面的顶部横栏宽度与外层卡片结构统一以第二页 `FundList.vue` 为基准。
 - 色彩方案（红涨绿跌 / 绿涨红跌）必须是用户可配置的，不得硬编码。已通过 Settings 页面和各页面顶栏统一实现。
 
-## 4. 下一步
+## 4. 已完成项回顾
 
-- 全量库严格全量 + 标记隔离已完成，下一步执行全量数据导入验证。
-- 若继续推进，优先级建议为：
-- 1. 运行 `sync_all.py` 全量导入，验证 1753 只基金入库统计
-- 2. 统一清理过期文档描述，避免 P0/P1 旧状态误导后续开发。
-- 3. 为 Rust `EngineManager` 补充真正的自动化单元测试，避免 `cargo test` 长期为 0 tests。
-- 4. 若进入发布准备，补齐 Tauri 正式图标资源，替换当前占位 `icon.png`。
-- 5. 根据用户决定执行提交、建 PR 或继续功能迭代。
+- [x] 全量库严格全量 + 标记隔离 — 7 个提交，65 个 Python 测试全绿
+- [x] 全量数据导入验证 — 1,753 只基金，1,742,865 条日线，1,749 条净值
+- [x] 清理过期文档 — 三份 human 版 Phase 文档已添加历史快照免责声明
+- [x] Rust 单元测试补齐 — 10 个测试全部通过
+- [x] Tauri 图标 — K 线蜡烛图标已替换（commit `f7a3eb5`）
+
+## 5. 下一步
+
+- 创建 GitHub Actions 自动编译工作流（用户明确要求）
+  - `.github/workflows/ci.yml` — PR 检查（pytest + npm test + cargo check）
+  - `.github/workflows/release.yml` — 打 tag 时触发跨平台 Tauri 构建
+  - 目标平台：Windows (NSIS)、macOS (DMG)、Linux (DEB/RPM/AppImage)
+  - TA-Lib 保留，在 CI 中为每个平台编译 C 库
+  - Python 引擎通过 PyInstaller 打包为 Tauri sidecar
