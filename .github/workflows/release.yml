@@ -27,7 +27,6 @@ jobs:
   build-tauri:
     name: Tauri Build (${{ matrix.platform.os }} - ${{ matrix.platform.target }})
     needs: create-release
-    needs: [create-release]
     strategy:
       fail-fast: false
       matrix:

@@ -1,0 +1,7 @@
+ruff
+mypy
+pytest
+pytest-cov
+pytest-mock
+a-trade-calendar
+pandas-stubs

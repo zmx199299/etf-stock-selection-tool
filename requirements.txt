@@ -1,0 +1,5 @@
+pandas
+akshare
+ta
+requests
+beautifulsoup4

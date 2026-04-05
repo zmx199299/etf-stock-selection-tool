@@ -12,3 +12,9 @@ dist/
 .worktrees/
 src-tauri/gen/
 src-tauri/binaries/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.egg-info/
+build/
+.coverage
