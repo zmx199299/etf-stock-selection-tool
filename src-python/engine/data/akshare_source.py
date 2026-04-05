@@ -17,6 +17,29 @@ INVEST_TYPE_MAP = [
     (["沪深300", "中证500", "中证1000", "上证50", "创业板", "科创", "指数", "红利"], "指数型"),
 ]
 
+def classify_invest_type(name: str) -> str:
+    for keywords, itype in INVEST_TYPE_MAP:
+        if any(kw in name for kw in keywords):
+            return itype
+    return "股票型"
+
+
+def classify_t_plus(name: str) -> str:
+    if any(kw in name for kw in T0_KEYWORDS):
+        return "T+0"
+    return "T+1"
+
+
+def _is_excluded(name: str) -> bool:
+    for kw in EXCLUDE_KEYWORDS_MONEY:
+        if kw in name:
+            return True
+    for kw in EXCLUDE_KEYWORDS_BOND:
+        if kw in name:
+            return True
+    return False
+
+
 class AkshareSource(DataSource):
 
     def fetch_fund_list(self) -> list[dict]:
@@ -45,10 +68,10 @@ class AkshareSource(DataSource):
                     "code": code,
                     "name": name,
                     "fund_type": ftype,
-                    "invest_type": self._classify_invest_type(name),
-                    "t_plus": self._classify_t_plus(name),
+                    "invest_type": classify_invest_type(name),
+                    "t_plus": classify_t_plus(name),
                     "list_date": "",
-                    "is_excluded": 1 if self._is_excluded(name) else 0,
+                    "is_excluded": 1 if _is_excluded(name) else 0,
                 }
                 funds.append(fund)
         return funds
@@ -95,21 +118,7 @@ class AkshareSource(DataSource):
         return results
 
     def _classify_invest_type(self, name: str) -> str:
-        for keywords, itype in INVEST_TYPE_MAP:
-            if any(kw in name for kw in keywords):
-                return itype
-        return "股票型"
+        return classify_invest_type(name)
 
     def _classify_t_plus(self, name: str) -> str:
-        if any(kw in name for kw in T0_KEYWORDS):
-            return "T+0"
-        return "T+1"
-
-    def _is_excluded(self, name: str) -> bool:
-        for kw in EXCLUDE_KEYWORDS_MONEY:
-            if kw in name:
-                return True
-        for kw in EXCLUDE_KEYWORDS_BOND:
-            if kw in name:
-                return True
-        return False
+        return classify_t_plus(name)

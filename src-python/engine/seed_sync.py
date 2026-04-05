@@ -1,11 +1,9 @@
 from __future__ import annotations
 
-from engine.data.akshare_source import AkshareSource
+from engine.data.akshare_source import classify_invest_type, classify_t_plus
 
 
 EXCLUDED_FUND_TYPE_KEYWORDS = ("货币", "固收", "债")
-
-_classifier = AkshareSource()
 
 
 def normalize_fund_code(value) -> str:
@@ -70,8 +68,8 @@ def build_full_market_fund_records(
                 "code": code,
                 "name": name,
                 "fund_type": market_label,
-                "invest_type": _classifier._classify_invest_type(name),
-                "t_plus": _classifier._classify_t_plus(name),
+                "invest_type": classify_invest_type(name),
+                "t_plus": classify_t_plus(name),
                 "list_date": "",
                 "is_excluded": 0,
                 "has_market_data": has_market_data,
