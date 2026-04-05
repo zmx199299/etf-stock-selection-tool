@@ -138,13 +138,27 @@ jobs:
       - name: Verify dist exists
         run: ls -la dist/
 
-      - name: Build Tauri app
-        uses: tauri-apps/tauri-action@v0
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          projectPath: src-tauri
-          args: --target ${{ matrix.platform.target }}
+      - name: Build Tauri app (Linux)
+        if: runner.os == 'Linux'
+        working-directory: src-tauri
+        run: |
+          cargo build --release --target ${{ matrix.platform.target }}
+          cargo build --release --target ${{ matrix.platform.target }} --bundles deb,rpm,appimage
+
+      - name: Build Tauri app (macOS)
+        if: runner.os == 'macOS'
+        working-directory: src-tauri
+        run: |
+          cargo build --release --target ${{ matrix.platform.target }}
+          cargo build --release --target ${{ matrix.platform.target }} --bundles dmg
+
+      - name: Build Tauri app (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        working-directory: src-tauri
+        run: |
+          cargo build --release --target ${{ matrix.platform.target }}
+          cargo build --release --target ${{ matrix.platform.target }} --bundles msi
 
       # ── Upload artifacts to GitHub Release ──
 
