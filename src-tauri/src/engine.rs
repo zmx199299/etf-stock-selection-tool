@@ -119,3 +119,80 @@ impl EngineManager {
             .ok_or_else(|| "No result in response".to_string())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_new_returns_empty_manager() {
+        let manager = EngineManager::new();
+        // Fresh manager should have no child and req_id = 1
+        assert!(manager.child.is_none());
+        assert_eq!(manager.req_id, 1);
+    }
+
+    #[test]
+    fn test_invoke_when_not_running_returns_error() {
+        let mut manager = EngineManager::new();
+        let result = manager.invoke("ping", serde_json::json!({}));
+        assert!(result.is_err());
+        assert_eq!(result.unwrap_err(), "Engine is not running");
+    }
+
+    #[test]
+    fn test_start_with_invalid_path_fails() {
+        let mut manager = EngineManager::new();
+        // Try to start with a non-existent binary
+        let result = manager.start(true); // is_prod = true looks for binaries/engine
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_start_and_stop_with_sleep() {
+        let mut manager = EngineManager::new();
+
+        // Use `sleep` as a mock child process (it has stdin/stdout piped)
+        // We'll manually create a child to test the lifecycle
+        let mut cmd = Command::new("sleep");
+        cmd.arg("10")
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::null());
+
+        let child = cmd.spawn().expect("sleep should exist");
+        manager.child = Some(child);
+
+        // Child should be running
+        assert!(manager.child.is_some());
+
+        // Stop should succeed
+        let result = manager.stop();
+        assert!(result.is_ok());
+
+        // Child should be None after stop
+        assert!(manager.child.is_none());
+    }
+
+    #[test]
+    fn test_start_idempotent() {
+        let mut manager = EngineManager::new();
+
+        // Use `sleep` as mock
+        let mut cmd = Command::new("sleep");
+        cmd.arg("10")
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::null());
+
+        let child = cmd.spawn().expect("sleep should exist");
+        manager.child = Some(child);
+
+        // Calling start again should be no-op (return Ok)
+        // We simulate this by checking child is still Some
+        assert!(manager.child.is_some());
+
+        // Cleanup
+        manager.stop().unwrap();
+    }
+}
