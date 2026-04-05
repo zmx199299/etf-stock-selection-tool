@@ -89,3 +89,105 @@ class TestAkshareMinuteQuotes:
 
         assert len(result) == 1
         assert result[0]['datetime'] == '2024-01-15 09:31:00'
+
+
+import os
+import tempfile
+from engine.models.database import Database
+
+
+class TestMinuteQuoteTable:
+    """测试 minute_quote 数据库表"""
+
+    def setup_method(self):
+        """每个测试前创建临时数据库"""
+        self.temp_dir = tempfile.mkdtemp()
+        self.db_path = os.path.join(self.temp_dir, "test.db")
+        self.db = Database(self.db_path)
+        self.db.init()
+
+    def teardown_method(self):
+        """每个测试后清理临时数据库"""
+        self.db.close()
+        if os.path.exists(self.db_path):
+            os.remove(self.db_path)
+        os.rmdir(self.temp_dir)
+
+    def test_minute_quote_table_exists(self):
+        """测试 minute_quote 表被创建"""
+        tables = self.db.get_tables()
+        assert 'minute_quote' in tables
+
+    def test_upsert_minute_quotes(self):
+        """测试插入分钟线数据"""
+        quotes = [
+            {
+                "code": "510300",
+                "datetime": "2024-01-15 09:31:00",
+                "period": "5",
+                "open": 4.10,
+                "close": 4.11,
+                "high": 4.12,
+                "low": 4.09,
+                "volume": 100000,
+                "amount": 410000,
+            },
+            {
+                "code": "510300",
+                "datetime": "2024-01-15 09:36:00",
+                "period": "5",
+                "open": 4.11,
+                "close": 4.12,
+                "high": 4.13,
+                "low": 4.10,
+                "volume": 120000,
+                "amount": 492000,
+            },
+        ]
+        self.db.upsert_minute_quotes(quotes)
+
+        result = self.db.get_minute_quotes("510300", "5", "2024-01-15 00:00:00", "2024-01-15 23:59:59")
+        assert len(result) == 2
+        assert result[0]["open"] == 4.10
+        assert result[1]["close"] == 4.12
+
+    def test_upsert_minute_quotes_duplicate(self):
+        """测试 UPSERT 逻辑（重复插入应更新）"""
+        quote = {
+            "code": "510300",
+            "datetime": "2024-01-15 09:31:00",
+            "period": "5",
+            "open": 4.10,
+            "close": 4.11,
+            "high": 4.12,
+            "low": 4.09,
+            "volume": 100000,
+            "amount": 410000,
+        }
+        self.db.upsert_minute_quotes([quote])
+
+        # 更新同一条记录
+        quote["close"] = 4.15
+        self.db.upsert_minute_quotes([quote])
+
+        result = self.db.get_minute_quotes("510300", "5", "2024-01-15 00:00:00", "2024-01-15 23:59:59")
+        assert len(result) == 1
+        assert result[0]["close"] == 4.15
+
+    def test_get_latest_minute_datetime(self):
+        """测试获取最新时间戳"""
+        quotes = [
+            {"code": "510300", "datetime": "2024-01-15 09:31:00", "period": "5",
+             "open": 4.10, "close": 4.11, "high": 4.12, "low": 4.09, "volume": 100000, "amount": 410000},
+            {"code": "510300", "datetime": "2024-01-15 10:31:00", "period": "5",
+             "open": 4.11, "close": 4.12, "high": 4.13, "low": 4.10, "volume": 120000, "amount": 492000},
+        ]
+        self.db.upsert_minute_quotes(quotes)
+
+        latest = self.db.get_latest_minute_datetime("510300", "5")
+        assert latest == "2024-01-15 10:31:00"
+
+    def test_get_latest_minute_datetime_empty(self):
+        """测试无数据时返回 None"""
+        latest = self.db.get_latest_minute_datetime("510300", "5")
+        assert latest is None

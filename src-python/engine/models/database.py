@@ -79,6 +79,17 @@ class Database:
             fund_count INTEGER, hit_count INTEGER,
             status TEXT, error TEXT
         );
+        CREATE TABLE IF NOT EXISTS minute_quote (
+            code TEXT NOT NULL,
+            datetime TEXT NOT NULL,
+            period TEXT NOT NULL,
+            open REAL, close REAL, high REAL, low REAL,
+            volume REAL, amount REAL,
+            PRIMARY KEY (code, datetime, period),
+            FOREIGN KEY (code) REFERENCES fund_info(code)
+        );
+        CREATE INDEX IF NOT EXISTS idx_minute_quote_code_period
+            ON minute_quote(code, period, datetime);
         """)
         self.conn.commit()
 
@@ -210,3 +221,85 @@ class Database:
                 (nav, premium_rate, code, date)
             )
             self.conn.commit()
+
+    def upsert_minute_quotes(self, quotes: list[dict]):
+        """批量插入或更新分钟线数据"""
+        c = self.conn.cursor()
+        for q in quotes:
+            c.execute("""
+                INSERT INTO minute_quote
+                    (code, datetime, period, open, close, high, low, volume, amount)
+                VALUES
+                    (:code, :datetime, :period, :open, :close, :high, :low, :volume, :amount)
+                ON CONFLICT(code, datetime, period) DO UPDATE SET
+                    open=excluded.open, close=excluded.close,
+                    high=excluded.high, low=excluded.low,
+                    volume=excluded.volume, amount=excluded.amount
+            """, q)
+        self.conn.commit()
+
+    def get_minute_quotes(self, code: str, period: str, start: str, end: str) -> list[dict]:
+        """查询分钟线数据"""
+        c = self.conn.cursor()
+        c.execute(
+            "SELECT * FROM minute_quote WHERE code=? AND period=? AND datetime>=? AND datetime<=? ORDER BY datetime",
+            (code, period, start, end)
+        )
+        return [dict(r) for r in c.fetchall()]
+
+    def get_latest_minute_datetime(self, code: str, period: str) -> Optional[str]:
+        """获取某只基金某周期的最新时间戳"""
+        c = self.conn.cursor()
+        c.execute(
+            "SELECT MAX(datetime) FROM minute_quote WHERE code=? AND period=?",
+            (code, period)
+        )
+        row = c.fetchone()
+        return row[0] if row and row[0] else None
+
+    def aggregate_120m_from_60m(self, code: str) -> list[dict]:
+        """从 60 分钟线聚合 120 分钟线数据"""
+        c = self.conn.cursor()
+        c.execute("""
+            SELECT
+                code,
+                CASE
+                    WHEN CAST(SUBSTR(datetime, 12, 2) AS INTEGER) < 12 THEN
+                        SUBSTR(datetime, 1, 11) || '09:30:00'
+                    ELSE
+                        SUBSTR(datetime, 1, 11) || '13:00:00'
+                END as datetime,
+                '120' as period,
+                FIRST(open) as open,
+                MAX(high) as high,
+                MIN(low) as low,
+                LAST(close) as close,
+                SUM(volume) as volume,
+                SUM(amount) as amount
+            FROM (
+                SELECT *,
+                    CASE
+                        WHEN CAST(SUBSTR(datetime, 12, 2) AS INTEGER) < 12 THEN 'AM'
+                        ELSE 'PM'
+                    END as session
+                FROM minute_quote
+                WHERE code = ? AND period = '60'
+            )
+            GROUP BY code, SUBSTR(datetime, 1, 10), session
+            ORDER BY datetime
+        """, (code,))
+
+        results = []
+        for row in c.fetchall():
+            results.append({
+                "code": row[0],
+                "datetime": row[1],
+                "period": row[2],
+                "open": row[3],
+                "close": row[4],
+                "high": row[5],
+                "low": row[6],
+                "volume": row[7],
+                "amount": row[8],
+            })
+        return results
