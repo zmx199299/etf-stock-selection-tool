@@ -191,3 +191,73 @@ class TestMinuteQuoteTable:
         """测试无数据时返回 None"""
         latest = self.db.get_latest_minute_datetime("510300", "5")
         assert latest is None
+
+
+from engine.sync import DataSyncPipeline
+from unittest.mock import MagicMock
+
+
+class TestMinuteQuoteSync:
+    """测试分钟线同步管道"""
+
+    def setup_method(self):
+        import os
+        import tempfile
+        from engine.models.database import Database
+        from engine.data.base import DataSource
+
+        self.temp_dir = tempfile.mkdtemp()
+        self.db_path = os.path.join(self.temp_dir, "test.db")
+        self.db = Database(self.db_path)
+        self.db.init()
+
+        # 创建 mock 数据源
+        self.mock_source = MagicMock(spec=DataSource)
+
+        self.pipeline = DataSyncPipeline(self.db, self.mock_source)
+
+    def teardown_method(self):
+        import os
+        self.db.close()
+        if os.path.exists(self.db_path):
+            os.remove(self.db_path)
+        os.rmdir(self.temp_dir)
+
+    def test_sync_minute_quotes_for_all(self):
+        """测试分钟线同步"""
+        # 先插入基金信息
+        self.db.upsert_fund_info([{
+            "code": "510300",
+            "name": "测试ETF",
+            "fund_type": "ETF",
+            "invest_type": "指数型",
+            "t_plus": "T+1",
+            "list_date": "2020-01-01",
+            "is_excluded": 0,
+            "has_market_data": 1,
+        }])
+
+        # Mock 分钟线数据
+        self.mock_source.fetch_minute_quotes.return_value = [
+            {"datetime": "2024-01-15 09:31:00", "open": 4.10, "close": 4.11,
+             "high": 4.12, "low": 4.09, "volume": 100000, "amount": 410000},
+        ]
+
+        total = self.pipeline.sync_minute_quotes_for_all(periods=['5'])
+
+        assert total == 1
+        quotes = self.db.get_minute_quotes("510300", "5", "2024-01-15 00:00:00", "2024-01-15 23:59:59")
+        assert len(quotes) == 1
+
+    def test_sync_minute_quotes_empty_response(self):
+        """测试空响应不中断同步"""
+        self.db.upsert_fund_info([{
+            "code": "510300", "name": "测试ETF", "fund_type": "ETF",
+            "invest_type": "指数型", "t_plus": "T+1", "list_date": "2020-01-01",
+            "is_excluded": 0, "has_market_data": 1,
+        }])
+
+        self.mock_source.fetch_minute_quotes.return_value = []
+
+        total = self.pipeline.sync_minute_quotes_for_all(periods=['5'])
+        assert total == 0

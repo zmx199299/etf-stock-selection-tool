@@ -61,6 +61,52 @@ class DataSyncPipeline:
         logger.info(f"Updated nav for {updated} records")
         return updated
 
+    def sync_minute_quotes_for_all(self, periods: list[str] = None) -> int:
+        """同步所有基金的分钟线数据
+        Args:
+            periods: 需要同步的周期列表，默认 ['1', '5', '60']
+        Returns:
+            同步的总条数
+        """
+        if periods is None:
+            periods = ['1', '5', '60']
+
+        funds = self.db.get_all_funds_with_market_data()
+        total = 0
+
+        for fund in funds:
+            code = fund["code"]
+            for period in periods:
+                try:
+                    quotes = self.source.fetch_minute_quotes(code, period)
+                    if not quotes:
+                        continue
+
+                    # 添加 code 和 period 字段
+                    for q in quotes:
+                        q["code"] = code
+                        q["period"] = period
+
+                    self.db.upsert_minute_quotes(quotes)
+                    total += len(quotes)
+                except Exception as e:
+                    logger.warning(f"Failed to sync {period}m quotes for {code}: {e}")
+                    continue
+
+        # 聚合 120 分钟线
+        for fund in funds:
+            try:
+                quotes_120m = self.db.aggregate_120m_from_60m(fund["code"])
+                if quotes_120m:
+                    self.db.upsert_minute_quotes(quotes_120m)
+                    total += len(quotes_120m)
+            except Exception as e:
+                logger.warning(f"Failed to aggregate 120m for {fund['code']}: {e}")
+                continue
+
+        logger.info(f"Synced {total} minute quotes for {len(funds)} funds")
+        return total
+
     def sync_all(self) -> dict:
         """执行完整同步流程"""
         funds_count = self.sync_fund_list()
