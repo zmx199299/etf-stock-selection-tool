@@ -20,8 +20,8 @@ class DataSyncPipeline:
         return len(funds)
 
     def sync_daily_quotes_for_all(self) -> int:
-        """同步所有活跃基金的日线行情到 daily_quote 表"""
-        funds = self.db.get_all_active_funds()
+        """同步所有活跃且有行情数据的基金的日线行情到 daily_quote 表"""
+        funds = self.db.get_all_funds_with_market_data()
         total = 0
         for fund in funds:
             code = fund["code"]
@@ -42,19 +42,22 @@ class DataSyncPipeline:
         return total
 
     def sync_nav_for_all(self) -> int:
-        """同步所有活跃基金的净值到 daily_quote 表"""
-        funds = self.db.get_all_active_funds()
+        """同步所有活跃且有行情数据的基金的净值到 daily_quote 表"""
+        funds = self.db.get_all_funds_with_market_data()
         updated = 0
         for fund in funds:
             code = fund["code"]
             nav_data = self.source.fetch_nav(code)
             if not nav_data:
                 continue
+            history_rows = []
             for nav_item in nav_data:
                 date = nav_item["date"]
                 nav = nav_item["nav"]
+                history_rows.append({"code": code, "date": date, "nav": nav})
                 self.db._update_nav(code, date, nav)
                 updated += 1
+            self.db.upsert_fund_nav_history(history_rows)
         logger.info(f"Updated nav for {updated} records")
         return updated
 
