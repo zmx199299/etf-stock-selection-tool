@@ -3,7 +3,7 @@
 mod engine;
 use engine::EngineManager;
 use std::sync::Mutex;
-use tauri::{Manager, State};
+use tauri::State;
 
 struct AppState {
     engine: Mutex<EngineManager>,
