@@ -49,20 +49,18 @@ impl EngineManager {
 
         let mut cmd = if is_prod {
             // In production, resolve the packaged sidecar path produced by Tauri bundling.
+            // Tauri v2 removes the target triple during bundling for externalBin paths.
             let app_handle = app_handle.ok_or("Missing app handle in production mode")?;
-            let target = std::env::consts::ARCH;
             let os = std::env::consts::OS;
-            let triple = match (os, target) {
-                ("linux", "x86_64") => "x86_64-unknown-linux-gnu",
-                ("macos", "x86_64") => "x86_64-apple-darwin",
-                ("macos", "aarch64") => "aarch64-apple-darwin",
-                ("windows", "x86_64") => "x86_64-pc-windows-msvc",
-                _ => return Err(format!("Unsupported platform: {os}-{target}")),
+            let exe_name = if os == "windows" {
+                "engine.exe"
+            } else {
+                "engine"
             };
 
             let sidecar_path = app_handle
                 .path()
-                .resolve(format!("binaries/engine-{triple}"), BaseDirectory::Resource)
+                .resolve(format!("binaries/{}", exe_name), BaseDirectory::Resource)
                 .map_err(|e| format!("Failed to resolve sidecar path: {e}"))?;
 
             Command::new(sidecar_path)
