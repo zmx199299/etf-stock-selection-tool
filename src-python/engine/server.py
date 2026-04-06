@@ -336,7 +336,7 @@ def create_real_server(db, source):
     # 注册方法
     server.register_method("ping", lambda: "pong")
     server.register_method(
-        "get_engine_status", lambda: {"status": "running", "version": "0.0.12"}
+        "get_engine_status", lambda: {"status": "running", "version": "0.0.13"}
     )
     server.register_method("fetch_legal_tax_rates", fetch_legal_tax_rates)
 

@@ -20,10 +20,14 @@ class DataSyncPipeline:
         logger.info(f"Synced {len(funds)} funds")
         return len(funds)
 
-    def sync_daily_quotes_for_all(self, limit_days: int = None) -> int:
+    def sync_daily_quotes_for_all(
+        self, limit_days: int = None, max_consecutive_failures: int = 20
+    ) -> int:
         """同步所有活跃且有行情数据的基金的日线行情到 daily_quote 表
         Args:
             limit_days: 限制抓取的天数，如果是 None 则抓取全部历史
+            max_consecutive_failures: 连续失败多少只基金后提前终止同步，
+                避免在所有数据源都不可用时浪费时间尝试全部基金
         """
         import datetime
 
@@ -35,11 +39,21 @@ class DataSyncPipeline:
 
         funds = self.db.get_all_funds_with_market_data()
         total = 0
+        consecutive_failures = 0
         for fund in funds:
             code = fund["code"]
             quotes = self.source.fetch_daily_quotes(code, start_date=start_date)
             if not quotes:
+                consecutive_failures += 1
+                if consecutive_failures >= max_consecutive_failures:
+                    logger.warning(
+                        f"连续 {consecutive_failures} 只基金无数据，"
+                        f"提前终止日线同步（已处理 {total} 条行情）"
+                    )
+                    break
                 continue
+            # 有数据，重置连续失败计数
+            consecutive_failures = 0
             for q in quotes:
                 q["code"] = code
                 # 提供默认值用于数据库插入
