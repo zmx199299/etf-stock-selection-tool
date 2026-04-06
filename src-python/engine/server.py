@@ -179,24 +179,6 @@ def get_screening_results():
         { "code": "588000", "name": "科创50ETF", "pattern": "V型反转", "strength": 78, "price": 1.023 },
     ]
 
-def get_scoring_data(code: str = "510300"):
-    # Mock data based on requested code or default
-    return {
-        "code": code,
-        "name": "沪深300ETF" if code == "510300" else f"基金{code}",
-        "price": 4.123,
-        "change": 1.25,
-        "signal": "强烈看多",
-        "trendScore": 80,
-        "momentumScore": 75,
-        "volatilityScore": 70,
-        "volumeScore": 65,
-        "adviceAmount": 24000,
-        "estimateFee": 10.50,
-        "stopLoss": 3.98,
-        "takeProfit": 4.35,
-    }
-
 def get_scheduler_data():
     return {
         "tasks": [
@@ -317,6 +299,11 @@ def create_real_server(db, source):
         return analysis_service.get_analysis_data(code)
 
     server.register_method("get_analysis_data", get_analysis_data_real)
+
+    def get_scoring_data_real(code: str):
+        return analysis_service.get_scoring_data(code)
+
+    server.register_method("get_scoring_data", get_scoring_data_real)
 
     return server
 

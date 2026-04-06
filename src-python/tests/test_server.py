@@ -126,18 +126,16 @@ def test_get_screening_results():
     assert "code" in res["result"][0]
     assert "strength" in res["result"][0]
 
-def test_get_scoring_data():
-    server = JSONRPCServer()
-    from engine.server import get_scoring_data
-    server.register_method("get_scoring_data", get_scoring_data)
+def test_create_real_server():
+    from engine.server import create_real_server
+    from unittest.mock import Mock
     
-    req_str = json.dumps({"jsonrpc": "2.0", "method": "get_scoring_data", "params": {"code": "159915"}, "id": 9})
-    res_str = server.handle_request(req_str)
-    res = json.loads(res_str)
+    db_mock = Mock()
+    source_mock = Mock()
+    server = create_real_server(db_mock, source_mock)
     
-    assert "error" not in res
-    assert res["result"]["code"] == "159915"
-    assert "trendScore" in res["result"]
+    # Check if get_scoring_data is registered
+    assert "get_scoring_data" in server.methods
 
 def test_get_scheduler_data():
     server = JSONRPCServer()
