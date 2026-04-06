@@ -135,14 +135,6 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 
-const isDev = import.meta.env.DEV
-
-const mockTaxRates = {
-  etf: { stamp_duty: 0.0 },
-  lof: { stamp_duty: 0.0 },
-  stock: { stamp_duty: 0.5 }
-}
-
 type AssetType = 'etf' | 'lof' | 'stock';
 
 const config = ref({
@@ -177,27 +169,18 @@ const previewTotal = computed(() => previewCommission.value + previewStampDuty.v
 
 const fetchTaxRates = async () => {
   try {
-    if (isDev) {
-      config.value.fees.etf.stampDuty = mockTaxRates.etf.stamp_duty
-      config.value.fees.lof.stampDuty = mockTaxRates.lof.stamp_duty
-      config.value.fees.stock.stampDuty = mockTaxRates.stock.stamp_duty
-    } else {
-      const { invoke } = await import('@tauri-apps/api/core')
-      const res: any = await invoke('invoke_engine', {
-        method: 'fetch_legal_tax_rates',
-        params: {}
-      })
-      if (res && res.stock) {
-        config.value.fees.etf.stampDuty = res.etf.stamp_duty
-        config.value.fees.lof.stampDuty = res.lof.stamp_duty
-        config.value.fees.stock.stampDuty = res.stock.stamp_duty
-      }
+    const { invoke } = await import('@tauri-apps/api/core')
+    const res: any = await invoke('invoke_engine', {
+      method: 'fetch_legal_tax_rates',
+      params: {}
+    })
+    if (res && res.stock) {
+      config.value.fees.etf.stampDuty = res.etf.stamp_duty
+      config.value.fees.lof.stampDuty = res.lof.stamp_duty
+      config.value.fees.stock.stampDuty = res.stock.stamp_duty
     }
   } catch (error) {
     console.error('获取法定税率失败:', error)
-    config.value.fees.etf.stampDuty = mockTaxRates.etf.stamp_duty
-    config.value.fees.lof.stampDuty = mockTaxRates.lof.stamp_duty
-    config.value.fees.stock.stampDuty = mockTaxRates.stock.stamp_duty
   }
 }
 
