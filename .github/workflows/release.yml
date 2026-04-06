@@ -118,7 +118,7 @@ jobs:
       - name: Build Python engine sidecar (Linux/macOS)
         if: runner.os != 'Windows'
         run: |
-          .venv/bin/pyinstaller src-python/main.py --onefile --name engine --clean --hidden-import=pandas --hidden-import=lxml --hidden-import=bs4 --hidden-import=openpyxl --hidden-import=tabulate --hidden-import=html5lib --hidden-import=requests --hidden-import=akshare
+          .venv/bin/pyinstaller src-python/main.py --onefile --name engine --clean --paths=src-python --collect-data=akshare --hidden-import=pandas --hidden-import=lxml --hidden-import=bs4 --hidden-import=openpyxl --hidden-import=tabulate --hidden-import=html5lib --hidden-import=requests --hidden-import=akshare
           mkdir -p src-tauri/binaries
           cp dist/engine "src-tauri/binaries/engine-${{ matrix.platform.target }}"
 
@@ -126,7 +126,7 @@ jobs:
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
-          .venv\Scripts\pyinstaller src-python\main.py --onefile --name engine --clean --hidden-import=pandas --hidden-import=lxml --hidden-import=bs4 --hidden-import=openpyxl --hidden-import=tabulate --hidden-import=html5lib --hidden-import=requests --hidden-import=akshare
+          .venv\Scripts\pyinstaller src-python\main.py --onefile --name engine --clean --paths=src-python --collect-data=akshare --hidden-import=pandas --hidden-import=lxml --hidden-import=bs4 --hidden-import=openpyxl --hidden-import=tabulate --hidden-import=html5lib --hidden-import=requests --hidden-import=akshare
           New-Item -ItemType Directory -Force -Path src-tauri\binaries
           Copy-Item dist\engine.exe "src-tauri\binaries\engine-${{ matrix.platform.target }}.exe"
 
