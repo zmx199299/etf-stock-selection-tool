@@ -5,6 +5,8 @@ import router from './router'
 import { useColorModeStore } from './stores/colorMode'
 import { ensureStartupSync } from './utils/startupSync'
 import './style.css'
+import 'echarts'
+import ECharts from 'vue-echarts'
 
 export async function bootstrap() {
   const app = createApp(App)
@@ -13,6 +15,7 @@ export async function bootstrap() {
   app.use(pinia)
   useColorModeStore(pinia).hydrate()
   app.use(router)
+  app.component('v-chart', ECharts)
 
   await ensureStartupSync()
 
