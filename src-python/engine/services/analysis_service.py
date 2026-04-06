@@ -1,6 +1,8 @@
+import math
+import pandas as pd
+from engine.scoring.scorer import Scorer
 """分析数据服务：将数据库数据转换为前端 AnalysisPeriod 格式"""
 import logging
-import pandas as pd
 from typing import Optional
 from engine.models.database import Database
 from engine.scoring.indicators import TechnicalIndicators
@@ -532,4 +534,51 @@ class AnalysisService:
             "stopLoss": f"跌破 {stop_loss} 止损",
             "holdingPeriod": "3-10 个交易日",
             "riskNote": "以上为系统自动分析，仅供参考",
+        }
+
+    def get_scoring_data(self, code: str) -> dict:
+        
+        fund_info = self.db.fetch_all("SELECT code, name FROM funds WHERE code = ?", (code,))
+        name = fund_info[0][1] if fund_info else f"基金{code}"
+        
+        # Get latest quote
+        quote_query = "SELECT close, pct_chg FROM daily_quotes WHERE code = ? ORDER BY date DESC LIMIT 1"
+        quote_info = self.db.fetch_all(quote_query, (code,))
+        
+        price = 0.0
+        change = 0.0
+        if quote_info:
+            price = float(quote_info[0][0])
+            change = float(quote_info[0][1]) if len(quote_info[0]) > 1 and quote_info[0][1] is not None else 0.0
+            
+        scorer = Scorer()
+        score_res = scorer.score(pd.DataFrame())
+        
+        advice_amount = 0
+        estimate_fee = 0.0
+        stop_loss = 0.0
+        take_profit = 0.0
+        
+        if price > 0:
+            lots = math.floor(10000 / (price * 100))
+            advice_amount = lots * 100
+            estimate_fee = round(advice_amount * price * 0.0002, 2)
+            stop_loss = round(price * 0.95, 3)
+            take_profit = round(price * 1.10, 3)
+            
+        return {
+            "code": code,
+            "name": name,
+            "price": price,
+            "change": change,
+            "total_score": score_res.get("total_score", 50.0),
+            "trend_score": score_res.get("trend_score", 50.0),
+            "momentum_score": score_res.get("momentum_score", 50.0),
+            "volatility_score": score_res.get("volatility_score", 50.0),
+            "volume_score": score_res.get("volume_score", 50.0),
+            "signal": score_res.get("signal", "中性"),
+            "advice_amount": advice_amount,
+            "estimate_fee": estimate_fee,
+            "stop_loss": stop_loss,
+            "take_profit": take_profit
         }

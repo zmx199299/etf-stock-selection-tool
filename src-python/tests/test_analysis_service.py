@@ -177,3 +177,46 @@ class TestAnalysisService:
         assert "summary" in metric
         assert "tone" in metric
         assert metric["tone"] in ("bullish", "neutral", "bearish")
+
+def test_get_scoring_data():
+    from unittest.mock import Mock
+    import pandas as pd
+    from engine.services.analysis_service import AnalysisService
+    
+    db_mock = Mock()
+    indicators_mock = Mock()
+    source_mock = Mock()
+    
+    # Mock DB query for fund info and daily quote
+    db_mock.fetch_all.side_effect = [
+        [("510300", "沪深300ETF")], # 基金基础信息
+        [(4.0, 1.0)], # 最新日线, close=4.0
+    ]
+    
+    service = AnalysisService(db_mock, indicators_mock, source_mock)
+    
+    # We also need a mock scorer. The real AnalysisService doesn't take scorer in constructor yet,
+    # wait, we might need to patch the Scorer or pass it. Let's patch it.
+    from unittest.mock import patch
+    with patch('engine.services.analysis_service.Scorer') as MockScorer:
+        instance = MockScorer.return_value
+        instance.score.return_value = {
+            "total_score": 60.0,
+            "trend_score": 60.0,
+            "momentum_score": 60.0,
+            "volatility_score": 60.0,
+            "volume_score": 60.0,
+            "signal": "看多"
+        }
+        
+        result = service.get_scoring_data("510300")
+        
+        assert result["code"] == "510300"
+        assert result["name"] == "沪深300ETF"
+        assert result["price"] == 4.0
+        assert result["change"] == 1.0
+        assert result["trend_score"] == 60.0
+        assert result["advice_amount"] == 2500 # 10000 / (4.0*100) = 25 -> 2500
+        assert result["estimate_fee"] == 2.0 # 2500 * 4.0 * 0.0002 = 2.0
+        assert result["stop_loss"] == 3.8 # 4.0 * 0.95
+        assert result["take_profit"] == 4.4 # 4.0 * 1.10
