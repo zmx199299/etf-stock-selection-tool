@@ -1,6 +1,7 @@
 import json
 import traceback
 
+
 def fetch_legal_tax_rates():
     """
     模拟联网查询最新的法定印花税率。
@@ -10,8 +11,9 @@ def fetch_legal_tax_rates():
     return {
         "etf": {"stamp_duty": 0.0},
         "lof": {"stamp_duty": 0.0},
-        "stock": {"stamp_duty": 0.5}
+        "stock": {"stamp_duty": 0.5},
     }
+
 
 def get_fund_list():
     # TODO: Replace with real DB query when sync engine is built
@@ -25,11 +27,11 @@ def get_fund_list():
             "high": 4.150,
             "low": 4.080,
             "volatility": (4.150 - 4.080) / 4.080,
-            "macd": { "signal": "bullish", "value": "金叉" },
-            "rsi": { "signal": "neutral", "value": "52" },
-            "boll": { "signal": "bullish", "value": "中轨" },
-            "ma5": { "signal": "bullish", "value": "上穿" },
-            "ma20": { "signal": "neutral", "value": "粘合" },
+            "macd": {"signal": "bullish", "value": "金叉"},
+            "rsi": {"signal": "neutral", "value": "52"},
+            "boll": {"signal": "bullish", "value": "中轨"},
+            "ma5": {"signal": "bullish", "value": "上穿"},
+            "ma20": {"signal": "neutral", "value": "粘合"},
             "score": 9,
         },
         {
@@ -41,11 +43,11 @@ def get_fund_list():
             "high": 2.280,
             "low": 2.230,
             "volatility": (2.280 - 2.230) / 2.230,
-            "macd": { "signal": "bullish", "value": "红柱" },
-            "rsi": { "signal": "bullish", "value": "68" },
-            "boll": { "signal": "bullish", "value": "下轨" },
-            "ma5": { "signal": "bullish", "value": "多头" },
-            "ma20": { "signal": "bullish", "value": "向上" },
+            "macd": {"signal": "bullish", "value": "红柱"},
+            "rsi": {"signal": "bullish", "value": "68"},
+            "boll": {"signal": "bullish", "value": "下轨"},
+            "ma5": {"signal": "bullish", "value": "多头"},
+            "ma20": {"signal": "bullish", "value": "向上"},
             "score": 10,
         },
         {
@@ -57,11 +59,11 @@ def get_fund_list():
             "high": 6.820,
             "low": 6.750,
             "volatility": (6.820 - 6.750) / 6.750,
-            "macd": { "signal": "bearish", "value": "死叉" },
-            "rsi": { "signal": "neutral", "value": "48" },
-            "boll": { "signal": "neutral", "value": "中轨" },
-            "ma5": { "signal": "bearish", "value": "下穿" },
-            "ma20": { "signal": "neutral", "value": "粘合" },
+            "macd": {"signal": "bearish", "value": "死叉"},
+            "rsi": {"signal": "neutral", "value": "48"},
+            "boll": {"signal": "neutral", "value": "中轨"},
+            "ma5": {"signal": "bearish", "value": "下穿"},
+            "ma20": {"signal": "neutral", "value": "粘合"},
             "score": 3,
         },
         {
@@ -73,14 +75,15 @@ def get_fund_list():
             "high": 1.060,
             "low": 1.020,
             "volatility": (1.060 - 1.020) / 1.020,
-            "macd": { "signal": "bearish", "value": "绿柱" },
-            "rsi": { "signal": "bearish", "value": "25" },
-            "boll": { "signal": "bearish", "value": "上轨" },
-            "ma5": { "signal": "bearish", "value": "空头" },
-            "ma20": { "signal": "bearish", "value": "向下" },
+            "macd": {"signal": "bearish", "value": "绿柱"},
+            "rsi": {"signal": "bearish", "value": "25"},
+            "boll": {"signal": "bearish", "value": "上轨"},
+            "ma5": {"signal": "bearish", "value": "空头"},
+            "ma20": {"signal": "bearish", "value": "向下"},
             "score": 1,
-        }
+        },
     ]
+
 
 def get_dashboard_signals():
     return [
@@ -99,7 +102,7 @@ def get_dashboard_signals():
             "expected_profit": 61.40,
             "expected_profit_pct": 0.61,
             "max_loss": 265.00,
-            "max_loss_pct": 2.65
+            "max_loss_pct": 2.65,
         },
         {
             "code": "512480",
@@ -116,7 +119,7 @@ def get_dashboard_signals():
             "expected_profit": 71.60,
             "expected_profit_pct": 0.72,
             "max_loss": 241.20,
-            "max_loss_pct": 2.43
+            "max_loss_pct": 2.43,
         },
         {
             "code": "159928",
@@ -133,7 +136,7 @@ def get_dashboard_signals():
             "expected_profit": 110.60,
             "expected_profit_pct": 1.11,
             "max_loss": 304.80,
-            "max_loss_pct": 3.05
+            "max_loss_pct": 3.05,
         },
         {
             "code": "513050",
@@ -150,7 +153,7 @@ def get_dashboard_signals():
             "expected_profit": 89.60,
             "expected_profit_pct": 0.90,
             "max_loss": 225.80,
-            "max_loss_pct": 2.26
+            "max_loss_pct": 2.26,
         },
         {
             "code": "518880",
@@ -167,31 +170,81 @@ def get_dashboard_signals():
             "expected_profit": 75.00,
             "expected_profit_pct": 0.80,
             "max_loss": 220.00,
-            "max_loss_pct": 2.33
-        }
+            "max_loss_pct": 2.33,
+        },
     ]
+
 
 def get_screening_results():
     return [
-        { "code": "510300", "name": "沪深300ETF", "pattern": "V型反转", "strength": 85, "price": 4.123 },
-        { "code": "159915", "name": "创业板ETF", "pattern": "V型反转", "strength": 92, "price": 2.256 },
-        { "code": "510500", "name": "中证500ETF", "pattern": "V型反转", "strength": 70, "price": 6.789 },
-        { "code": "588000", "name": "科创50ETF", "pattern": "V型反转", "strength": 78, "price": 1.023 },
+        {
+            "code": "510300",
+            "name": "沪深300ETF",
+            "pattern": "V型反转",
+            "strength": 85,
+            "price": 4.123,
+        },
+        {
+            "code": "159915",
+            "name": "创业板ETF",
+            "pattern": "V型反转",
+            "strength": 92,
+            "price": 2.256,
+        },
+        {
+            "code": "510500",
+            "name": "中证500ETF",
+            "pattern": "V型反转",
+            "strength": 70,
+            "price": 6.789,
+        },
+        {
+            "code": "588000",
+            "name": "科创50ETF",
+            "pattern": "V型反转",
+            "strength": 78,
+            "price": 1.023,
+        },
     ]
+
 
 def get_scheduler_data():
     return {
         "tasks": [
-            { "id": 1, "name": "同步基金列表", "cron": "每日 00:00", "enabled": True },
-            { "id": 2, "name": "初步行情筛选", "cron": "每日 15:30", "enabled": True },
-            { "id": 3, "name": "净值更新与折溢价计算", "cron": "每日 21:00", "enabled": True },
+            {"id": 1, "name": "同步基金列表", "cron": "每日 00:00", "enabled": True},
+            {"id": 2, "name": "初步行情筛选", "cron": "每日 15:30", "enabled": True},
+            {
+                "id": 3,
+                "name": "净值更新与折溢价计算",
+                "cron": "每日 21:00",
+                "enabled": True,
+            },
         ],
         "logs": [
-            { "id": 1, "time": "2026-03-29 21:05:12", "taskName": "净值更新与折溢价计算", "status": "成功", "message": "共更新 512 只基金净值" },
-            { "id": 2, "time": "2026-03-29 15:32:45", "taskName": "初步行情筛选", "status": "成功", "message": "筛选出 34 只形态匹配基金" },
-            { "id": 3, "time": "2026-03-29 00:01:23", "taskName": "同步基金列表", "status": "成功", "message": "列表无变化" },
-        ]
+            {
+                "id": 1,
+                "time": "2026-03-29 21:05:12",
+                "taskName": "净值更新与折溢价计算",
+                "status": "成功",
+                "message": "共更新 512 只基金净值",
+            },
+            {
+                "id": 2,
+                "time": "2026-03-29 15:32:45",
+                "taskName": "初步行情筛选",
+                "status": "成功",
+                "message": "筛选出 34 只形态匹配基金",
+            },
+            {
+                "id": 3,
+                "time": "2026-03-29 00:01:23",
+                "taskName": "同步基金列表",
+                "status": "成功",
+                "message": "列表无变化",
+            },
+        ],
     }
+
 
 class JSONRPCServer:
     def __init__(self):
@@ -204,30 +257,32 @@ class JSONRPCServer:
         return {
             "jsonrpc": "2.0",
             "error": {"code": code, "message": message},
-            "id": req_id
+            "id": req_id,
         }
 
     def _make_success(self, result, req_id):
-        return {
-            "jsonrpc": "2.0",
-            "result": result,
-            "id": req_id
-        }
+        return {"jsonrpc": "2.0", "result": result, "id": req_id}
 
     def handle_request(self, req_str: str) -> str:
         try:
             req = json.loads(req_str)
         except json.JSONDecodeError:
             return json.dumps(self._make_error(-32700, "Parse error"))
-            
+
         req_id = req.get("id")
 
-        if not isinstance(req, dict) or req.get("jsonrpc") != "2.0" or "method" not in req:
+        if (
+            not isinstance(req, dict)
+            or req.get("jsonrpc") != "2.0"
+            or "method" not in req
+        ):
             return json.dumps(self._make_error(-32600, "Invalid Request", req_id))
 
         method_name = req["method"]
         if method_name not in self.methods:
-            return json.dumps(self._make_error(-32601, f"Method not found: {method_name}", req_id))
+            return json.dumps(
+                self._make_error(-32601, f"Method not found: {method_name}", req_id)
+            )
 
         params = req.get("params", {})
         func = self.methods[method_name]
@@ -245,11 +300,12 @@ class JSONRPCServer:
             # tb = traceback.format_exc() # Useful for debugging but maybe not expose everything to client
             return json.dumps(self._make_error(-32000, str(e), req_id))
 
-    def run_stdio(self): # pragma: no cover
+    def run_stdio(self):  # pragma: no cover
         """
         Main loop for standard I/O communication (used by Tauri sidecar).
         """
         import sys
+
         for line in sys.stdin:
             line = line.strip()
             if not line:
@@ -267,7 +323,7 @@ def create_real_server(db, source):
     from engine.scoring.scorer import Scorer
     from engine.sync import DataSyncPipeline
     from engine.services.analysis_service import AnalysisService
-    
+
     server = JSONRPCServer()
 
     # 初始化组件
@@ -279,7 +335,9 @@ def create_real_server(db, source):
 
     # 注册方法
     server.register_method("ping", lambda: "pong")
-    server.register_method("get_engine_status", lambda: {"status": "running", "version": "0.0.6"})
+    server.register_method(
+        "get_engine_status", lambda: {"status": "running", "version": "0.0.6"}
+    )
     server.register_method("fetch_legal_tax_rates", fetch_legal_tax_rates)
 
     # 使用真实 service 层
@@ -294,6 +352,11 @@ def create_real_server(db, source):
         return sync_pipeline.sync_all()
 
     server.register_method("sync_data", sync_data)
+
+    def sync_fund_complete_real(code: str):
+        return sync_pipeline.sync_fund_complete(code)
+
+    server.register_method("sync_fund_complete", sync_fund_complete_real)
 
     def get_analysis_data_real(code: str):
         return analysis_service.get_analysis_data(code)
@@ -311,6 +374,7 @@ def create_real_server(db, source):
 def _build_dashboard_signals(db, fund_service):
     """从数据库构建 dashboard signals"""
     import pandas as pd
+
     funds = db.get_all_active_funds()
     if not funds:
         return []
@@ -333,28 +397,38 @@ def _build_dashboard_signals(db, fund_service):
 
         current_price = float(latest["close"])
         prev_close = float(prev["close"])
-        change_pct = round((current_price - prev_close) / prev_close * 100, 2) if prev_close != 0 else 0.0
+        change_pct = (
+            round((current_price - prev_close) / prev_close * 100, 2)
+            if prev_close != 0
+            else 0.0
+        )
 
         nav = float(latest.get("nav", 0)) if pd.notna(latest.get("nav")) else None
         nav_date = latest.get("date") if "date" in df.columns else None
-        premium_rate = round(float(latest.get("premium_rate", 0)) * 100, 2) if pd.notna(latest.get("premium_rate")) else None
+        premium_rate = (
+            round(float(latest.get("premium_rate", 0)) * 100, 2)
+            if pd.notna(latest.get("premium_rate"))
+            else None
+        )
 
-        signals.append({
-            "code": code,
-            "name": fund["name"],
-            "t_plus": fund["t_plus"],
-            "current_price": round(current_price, 3),
-            "change_pct": change_pct,
-            "buy_price": None,
-            "sell_price": None,
-            "stop_loss": None,
-            "latest_nav": round(nav, 3) if nav else None,
-            "nav_date": nav_date,
-            "premium_rate": premium_rate,
-            "expected_profit": None,
-            "expected_profit_pct": None,
-            "max_loss": None,
-            "max_loss_pct": None,
-        })
+        signals.append(
+            {
+                "code": code,
+                "name": fund["name"],
+                "t_plus": fund["t_plus"],
+                "current_price": round(current_price, 3),
+                "change_pct": change_pct,
+                "buy_price": None,
+                "sell_price": None,
+                "stop_loss": None,
+                "latest_nav": round(nav, 3) if nav else None,
+                "nav_date": nav_date,
+                "premium_rate": premium_rate,
+                "expected_profit": None,
+                "expected_profit_pct": None,
+                "max_loss": None,
+                "max_loss_pct": None,
+            }
+        )
 
     return signals

@@ -382,6 +382,11 @@ function getPeriodDisplayLabel(key: string, fallbackLabel?: string) {
 const fetchAnalysisData = async (code: string) => {
   activeAnalysis.value = null
   try {
+    await invoke('invoke_engine', {
+      method: 'sync_fund_complete',
+      params: { code }
+    })
+
     const res = await invoke('invoke_engine', {
       method: 'get_analysis_data',
       params: { code }

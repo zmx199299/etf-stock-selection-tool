@@ -4,18 +4,61 @@ import pandas as pd
 from .base import DataSource
 
 # T+0 基金关键词（跨境、货币、债券、黄金、商品类ETF支持T+0）
-T0_KEYWORDS = ["跨境", "QDII", "黄金", "商品", "货币", "债券", "油", "铜", "豆粕", "标普", "纳指", "恒生", "日经", "港股"]
+T0_KEYWORDS = [
+    "跨境",
+    "QDII",
+    "黄金",
+    "商品",
+    "货币",
+    "债券",
+    "油",
+    "铜",
+    "豆粕",
+    "标普",
+    "纳指",
+    "恒生",
+    "日经",
+    "港股",
+]
 # 排除关键词
 EXCLUDE_KEYWORDS_MONEY = ["货币", "理财", "现金"]
 EXCLUDE_KEYWORDS_BOND = ["债券", "债", "利率", "城投"]
 # 投资类别映射关键词
 INVEST_TYPE_MAP = [
-    (["跨境", "QDII", "纳指", "标普", "日经", "恒生", "港股", "德国", "法国"], "跨境型(QDII)"),
+    (
+        ["跨境", "QDII", "纳指", "标普", "日经", "恒生", "港股", "德国", "法国"],
+        "跨境型(QDII)",
+    ),
     (["黄金", "白银", "油", "铜", "豆粕", "商品", "有色"], "商品型"),
     (["REITs", "REIT", "产园", "仓储", "产业园", "高速", "保障房"], "REITs"),
-    (["行业", "主题", "科技", "医药", "消费", "军工", "新能源", "半导体", "芯片", "光伏", "白酒", "金融", "银行", "地产", "煤炭", "钢铁", "农业"], "行业主题型"),
-    (["沪深300", "中证500", "中证1000", "上证50", "创业板", "科创", "指数", "红利"], "指数型"),
+    (
+        [
+            "行业",
+            "主题",
+            "科技",
+            "医药",
+            "消费",
+            "军工",
+            "新能源",
+            "半导体",
+            "芯片",
+            "光伏",
+            "白酒",
+            "金融",
+            "银行",
+            "地产",
+            "煤炭",
+            "钢铁",
+            "农业",
+        ],
+        "行业主题型",
+    ),
+    (
+        ["沪深300", "中证500", "中证1000", "上证50", "创业板", "科创", "指数", "红利"],
+        "指数型",
+    ),
 ]
+
 
 def classify_invest_type(name: str) -> str:
     for keywords, itype in INVEST_TYPE_MAP:
@@ -41,14 +84,13 @@ def _is_excluded(name: str) -> bool:
 
 
 class AkshareSource(DataSource):
-
     def fetch_fund_list(self) -> list[dict]:
         # 获取ETF列表
         try:
             df_etf = ak.fund_etf_spot_em()
         except Exception:
             df_etf = pd.DataFrame()
-            
+
         # 获取LOF列表
         try:
             df_lof = ak.fund_lof_spot_em()
@@ -79,9 +121,10 @@ class AkshareSource(DataSource):
     def fetch_daily_quotes(self, code: str, start_date: str = None) -> list[dict]:
         try:
             df = ak.fund_etf_hist_em(
-                symbol=code, period="daily",
+                symbol=code,
+                period="daily",
                 start_date=start_date.replace("-", "") if start_date else "19900101",
-                adjust=""
+                adjust="",
             )
         except Exception:
             return []
@@ -89,15 +132,17 @@ class AkshareSource(DataSource):
             return []
         results = []
         for _, row in df.iterrows():
-            results.append({
-                "date": str(row.get("日期", ""))[:10],
-                "open": float(row.get("开盘", 0)),
-                "close": float(row.get("收盘", 0)),
-                "high": float(row.get("最高", 0)),
-                "low": float(row.get("最低", 0)),
-                "volume": float(row.get("成交量", 0)),
-                "amount": float(row.get("成交额", 0)),
-            })
+            results.append(
+                {
+                    "date": str(row.get("日期", ""))[:10],
+                    "open": float(row.get("开盘", 0)),
+                    "close": float(row.get("收盘", 0)),
+                    "high": float(row.get("最高", 0)),
+                    "low": float(row.get("最低", 0)),
+                    "volume": float(row.get("成交量", 0)),
+                    "amount": float(row.get("成交额", 0)),
+                }
+            )
         return results
 
     def fetch_nav(self, code: str, start_date: str = None) -> list[dict]:
@@ -123,16 +168,19 @@ class AkshareSource(DataSource):
     def _classify_t_plus(self, name: str) -> str:
         return classify_t_plus(name)
 
-    def fetch_minute_quotes(self, code: str, period: str) -> list[dict]:
+    def fetch_minute_quotes(
+        self, code: str, period: str, start_date: str = None
+    ) -> list[dict]:
         """获取指定基金的分钟线行情
         Args:
             code: 基金代码
             period: 周期标识 '1', '5', '60'
+            start_date: 开始日期 (YYYY-MM-DD)，可选
         Returns:
             [{"datetime": "YYYY-MM-DD HH:MM:SS", "open": float, "close": float,
               "high": float, "low": float, "volume": float, "amount": float}]
         """
-        if period not in ('1', '5', '60'):
+        if period not in ("1", "5", "60"):
             return []
 
         try:
@@ -149,19 +197,27 @@ class AkshareSource(DataSource):
         results = []
         for _, row in df.iterrows():
             time_str = str(row.get("时间", ""))
-            if ' ' in time_str:
+            if " " in time_str:
                 datetime_str = time_str[:19]
             else:
                 datetime_str = time_str
 
-            results.append({
-                "datetime": datetime_str,
-                "open": float(row.get("开盘", 0)),
-                "close": float(row.get("收盘", 0)),
-                "high": float(row.get("最高", 0)),
-                "low": float(row.get("最低", 0)),
-                "volume": float(row.get("成交量", 0)),
-                "amount": float(row.get("成交额", 0)),
-            })
+            # 如果指定了 start_date，进行过滤
+            if start_date:
+                date_part = datetime_str[:10]
+                if date_part < start_date:
+                    continue
+
+            results.append(
+                {
+                    "datetime": datetime_str,
+                    "open": float(row.get("开盘", 0)),
+                    "close": float(row.get("收盘", 0)),
+                    "high": float(row.get("最高", 0)),
+                    "low": float(row.get("最低", 0)),
+                    "volume": float(row.get("成交量", 0)),
+                    "amount": float(row.get("成交额", 0)),
+                }
+            )
 
         return results
