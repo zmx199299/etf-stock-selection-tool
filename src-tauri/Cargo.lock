@@ -814,7 +814,7 @@ dependencies = [
 
 [[package]]
 name = "etf-analyzer"
-version = "0.0.9"
+version = "0.0.10"
 dependencies = [
  "dirs",
  "env_logger",

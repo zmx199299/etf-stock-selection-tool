@@ -2,7 +2,6 @@ use serde::{Deserialize, Serialize};
 use std::fs;
 use std::io::{BufRead, BufReader, Write};
 use std::process::{Child, ChildStdout, Command, Stdio};
-use tauri::{path::BaseDirectory, Manager};
 
 #[derive(Serialize)]
 pub struct JsonRpcRequest {
@@ -44,27 +43,43 @@ impl EngineManager {
     pub fn start(
         &mut self,
         is_prod: bool,
-        app_handle: Option<&tauri::AppHandle>,
+        _app_handle: Option<&tauri::AppHandle>,
     ) -> Result<(), String> {
         if self.child.is_some() {
             return Ok(());
         }
 
         let mut cmd = if is_prod {
-            // In production, resolve the packaged sidecar path produced by Tauri bundling.
-            // Tauri v2 removes the target triple during bundling for externalBin paths.
-            let app_handle = app_handle.ok_or("Missing app handle in production mode")?;
-            let os = std::env::consts::OS;
-            let exe_name = if os == "windows" {
+            // 生产模式：sidecar 二进制在主程序 exe 同目录下
+            // 复制 tauri-plugin-shell 的 relative_command_path 逻辑：
+            // current_exe().parent() + "engine" (Windows 自动加 .exe)
+            let exe_dir = std::env::current_exe()
+                .map_err(|e| format!("Failed to get current exe path: {e}"))?
+                .parent()
+                .ok_or("Current exe has no parent directory")?
+                .to_path_buf();
+
+            let exe_name = if std::env::consts::OS == "windows" {
                 "engine.exe"
             } else {
                 "engine"
             };
 
-            let sidecar_path = app_handle
-                .path()
-                .resolve(format!("binaries/{}", exe_name), BaseDirectory::Resource)
-                .map_err(|e| format!("Failed to resolve sidecar path: {e}"))?;
+            let sidecar_path = exe_dir.join(exe_name);
+            log::info!("Sidecar path resolved to: {:?}", sidecar_path);
+
+            if !sidecar_path.exists() {
+                return Err(format!(
+                    "Sidecar binary not found at: {}. Contents of exe dir: {:?}",
+                    sidecar_path.display(),
+                    fs::read_dir(&exe_dir)
+                        .map(|entries| entries
+                            .filter_map(|e| e.ok())
+                            .map(|e| e.file_name().to_string_lossy().to_string())
+                            .collect::<Vec<_>>())
+                        .unwrap_or_default()
+                ));
+            }
 
             Command::new(sidecar_path)
         } else {
