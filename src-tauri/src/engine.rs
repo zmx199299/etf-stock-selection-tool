@@ -69,15 +69,21 @@ impl EngineManager {
             Command::new(sidecar_path)
         } else {
             // In development, run python directly
-            // Ensure we use the venv python if available, else fallback to python3
-            let python_bin = if std::path::Path::new(".venv/bin/python").exists() {
-                ".venv/bin/python"
+            // cargo run 的工作目录是 src-tauri/，需要切到项目根目录才能找到 .venv 和 src-python
+            let project_root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+                .parent()
+                .expect("CARGO_MANIFEST_DIR should have a parent");
+
+            let venv_python = project_root.join(".venv/bin/python");
+            let python_bin = if venv_python.exists() {
+                venv_python.to_string_lossy().to_string()
             } else {
-                "python3"
+                "python3".to_string()
             };
 
-            let mut c = Command::new(python_bin);
-            c.arg("src-python/main.py");
+            let mut c = Command::new(&python_bin);
+            c.arg(project_root.join("src-python/main.py"));
+            c.current_dir(project_root);
             c
         };
 
