@@ -37,8 +37,10 @@ describe('前端测试基线', () => {
     const hydrate = vi.fn()
     const mount = vi.fn()
     const use = vi.fn().mockReturnThis()
+    const component = vi.fn().mockReturnThis()
     const createApp = vi.fn(() => ({
       use,
+      component,
       mount,
     }))
     const createPinia = vi.fn(() => ({ pinia: true }))
