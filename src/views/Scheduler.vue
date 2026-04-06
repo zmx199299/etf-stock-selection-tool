@@ -48,44 +48,28 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 
-const isDev = import.meta.env.DEV
-
-const mockSchedulerData = {
-  tasks: [
-    { id: 1, name: '同步基金列表', cron: '每日 00:00', enabled: true },
-    { id: 2, name: '初步行情筛选', cron: '每日 15:30', enabled: true },
-    { id: 3, name: '净值更新与折溢价计算', cron: '每日 21:00', enabled: true },
-  ],
-  logs: [
-    { id: 1, time: '2026-03-29 21:05:12', taskName: '净值更新与折溢价计算', status: '成功', message: '共更新 512 只基金净值' },
-    { id: 2, time: '2026-03-29 15:32:45', taskName: '初步行情筛选', status: '成功', message: '筛选出 34 只形态匹配基金' },
-    { id: 3, time: '2026-03-29 00:01:23', taskName: '同步基金列表', status: '成功', message: '列表无变化' },
-  ]
-}
-
 const tasks = ref<any[]>([])
 const logs = ref<any[]>([])
+const error = ref<string>('')
 
 const fetchSchedulerData = async () => {
   try {
-    if (isDev) {
-      tasks.value = mockSchedulerData.tasks
-      logs.value = mockSchedulerData.logs
-    } else {
-      const { invoke } = await import('@tauri-apps/api/core')
-      const res: any = await invoke('invoke_engine', {
-        method: 'get_scheduler_data',
-        params: {}
-      })
-      if (res) {
-        tasks.value = res.tasks || []
-        logs.value = res.logs || []
-      }
+    const { invoke } = await import('@tauri-apps/api/core')
+    const res: any = await invoke('invoke_engine', {
+      method: 'get_scheduler_data',
+      params: {}
+    })
+    if (res) {
+      tasks.value = res.tasks || []
+      logs.value = res.logs || []
     }
-  } catch (error) {
-    console.error('获取定时任务数据失败:', error)
-    tasks.value = mockSchedulerData.tasks
-    logs.value = mockSchedulerData.logs
+  } catch (e) {
+    console.error('获取定时任务数据失败:', e)
+    error.value = e instanceof Error ? e.message : String(e)
+    if (tasks.value.length === 0) {
+      tasks.value = []
+      logs.value = []
+    }
   }
 }
 
