@@ -97,3 +97,43 @@ class TestMainModule:
         finally:
             if os.path.exists(db_path):
                 os.unlink(db_path)
+
+
+class TestBackgroundSyncThreadSafety:
+    """验证后台同步线程使用独立的数据库连接"""
+
+    def test_background_sync_creates_own_db_connection(self):
+        """background_sync 应在内部创建自己的 Database 实例，参数应为 db_path 而非 db 对象"""
+        if "main" in sys.modules:
+            del sys.modules["main"]
+        from main import background_sync
+
+        fd, db_path = tempfile.mkstemp(suffix=".db")
+        os.close(fd)
+
+        try:
+            source = MagicMock()
+
+            # Patch Database 和 DataSyncPipeline 来验证 background_sync 内部行为
+            with (
+                patch("main.Database") as mock_db_class,
+                patch("main.DataSyncPipeline") as mock_pipeline_class,
+            ):
+                mock_db_instance = MagicMock()
+                mock_db_class.return_value = mock_db_instance
+                mock_pipeline = MagicMock()
+                mock_pipeline_class.return_value = mock_pipeline
+
+                # 传入 db_path（字符串），background_sync 应在内部创建新 Database
+                background_sync(db_path, source)
+
+                # 验证 Database 在后台线程内部被创建并 init
+                mock_db_class.assert_called_once_with(db_path)
+                mock_db_instance.init.assert_called_once()
+
+                # 验证 DataSyncPipeline 使用的是新建的 db 实例
+                mock_pipeline_class.assert_called_once_with(mock_db_instance, source)
+                mock_pipeline.sync_all.assert_called_once_with(limit_days=60)
+        finally:
+            if os.path.exists(db_path):
+                os.unlink(db_path)

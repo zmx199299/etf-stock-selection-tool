@@ -16,13 +16,17 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
-def background_sync(db, source):
-    """如果数据库为空，在后台默默进行首次全市场 ETF+LOF 同步（仅最近60天）"""
+def background_sync(db_path, source):
+    """如果数据库为空，在后台默默进行首次全市场 ETF+LOF 同步（仅最近60天）。
+    使用独立的数据库连接，避免与主线程 SQLite 连接冲突。"""
     logger.info("Database is empty. Starting background sync (last 60 days)...")
     try:
-        pipeline = DataSyncPipeline(db, source)
+        bg_db = Database(db_path)
+        bg_db.init()
+        pipeline = DataSyncPipeline(bg_db, source)
         pipeline.sync_all(limit_days=60)
         logger.info("Background sync completed successfully.")
+        bg_db.close()
     except Exception as e:
         logger.error(f"Background sync failed: {e}")
 
@@ -46,7 +50,7 @@ def main():
         funds = db.get_all_funds_with_market_data()
         if not funds:
             sync_thread = threading.Thread(
-                target=background_sync, args=(db, source), daemon=True
+                target=background_sync, args=(db_path, source), daemon=True
             )
             sync_thread.start()
     except Exception as e:

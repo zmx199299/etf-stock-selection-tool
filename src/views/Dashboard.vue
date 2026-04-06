@@ -119,7 +119,7 @@ function toStartupSyncAlertMessage() {
     return ''
   }
 
-  return '启动同步失败，请注意核对当前数据状态'
+  return startupSyncState.message
 }
 
 const filteredSignals = computed(() => {

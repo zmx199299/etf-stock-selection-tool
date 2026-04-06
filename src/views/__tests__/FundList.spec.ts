@@ -323,7 +323,7 @@ describe('FundList', () => {
 
     vi.doMock('../../utils/startupSync', () => ({
       ensureStartupSync: vi.fn().mockResolvedValue(undefined),
-      getStartupSyncState: () => ({ status: 'error', message: '同步失败，当前显示本地旧数据' }),
+      getStartupSyncState: () => ({ status: 'error', message: '引擎连接失败，当前显示本地旧数据' }),
     }))
 
     vi.doMock('@tauri-apps/api/core', () => ({ invoke }))
@@ -333,9 +333,8 @@ describe('FundList', () => {
 
     await flushPromises()
 
-    expect(wrapper.get('[data-test="startup-sync-alert"]').text()).toContain('启动同步失败')
-    expect(wrapper.get('[data-test="startup-sync-alert"]').text()).toContain('核对当前数据状态')
-    expect(wrapper.get('[data-test="startup-sync-alert"]').text()).not.toContain('旧数据')
+    expect(wrapper.get('[data-test="startup-sync-alert"]').text()).toContain('引擎连接失败')
+    expect(wrapper.get('[data-test="startup-sync-alert"]').text()).toContain('本地旧数据')
     expect(wrapper.text()).toContain('失败后基金')
   })
 })

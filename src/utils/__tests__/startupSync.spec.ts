@@ -12,12 +12,8 @@ describe('startupSync', () => {
     vi.resetModules()
   })
 
-  it('生产环境首次 ensureStartupSync 会调用 sync_data 并把状态置为 success', async () => {
-    const invoke = vi.fn().mockResolvedValue({
-      funds_synced: 10,
-      quotes_synced: 20,
-      nav_synced: 5,
-    })
+  it('生产环境首次 ensureStartupSync 会调用 ping 确认引擎存活，并把状态置为 success', async () => {
+    const invoke = vi.fn().mockResolvedValue('pong')
 
     vi.doMock('@tauri-apps/api/core', () => ({ invoke }))
     vi.stubEnv('PROD', true)
@@ -27,7 +23,7 @@ describe('startupSync', () => {
     await ensureStartupSync()
 
     expect(invoke).toHaveBeenCalledWith('invoke_engine', {
-      method: 'sync_data',
+      method: 'ping',
       params: {},
     })
     expect(getStartupSyncState().status).toBe('success')
@@ -44,12 +40,12 @@ describe('startupSync', () => {
     await expect(ensureStartupSync()).resolves.toBeUndefined()
 
     expect(invoke).toHaveBeenCalledWith('invoke_engine', {
-      method: 'sync_data',
+      method: 'ping',
       params: {},
     })
     expect(getStartupSyncState()).toEqual({
       status: 'error',
-      message: '同步失败，当前显示本地旧数据',
+      message: '引擎连接失败，当前显示本地旧数据',
     })
   })
 
@@ -85,5 +81,31 @@ describe('startupSync', () => {
 
     expect(invoke).not.toHaveBeenCalled()
     expect(getStartupSyncState()).toEqual({ status: 'success' })
+  })
+
+  it('setStartupSyncError 可直接将状态置为 error（供引擎启动失败时使用）', async () => {
+    const { setStartupSyncError, getStartupSyncState } = await import('../startupSync')
+
+    setStartupSyncError('引擎进程启动失败')
+
+    expect(getStartupSyncState()).toEqual({
+      status: 'error',
+      message: '引擎进程启动失败',
+    })
+  })
+
+  it('setStartupSyncError 后 ensureStartupSync 不再发起网络调用', async () => {
+    const invoke = vi.fn()
+
+    vi.doMock('@tauri-apps/api/core', () => ({ invoke }))
+    vi.stubEnv('PROD', true)
+
+    const { setStartupSyncError, ensureStartupSync, getStartupSyncState } = await import('../startupSync')
+
+    setStartupSyncError('引擎未启动')
+    await ensureStartupSync()
+
+    expect(invoke).not.toHaveBeenCalled()
+    expect(getStartupSyncState().status).toBe('error')
   })
 })

@@ -17,6 +17,7 @@ afterEach(() => {
   vi.doUnmock('../router/index')
   vi.doUnmock('../stores/colorMode')
   vi.doUnmock('../utils/startupSync')
+  vi.doUnmock('@tauri-apps/api/core')
   vi.resetModules()
   vi.clearAllMocks()
 })
@@ -65,6 +66,10 @@ describe('前端测试基线', () => {
     }))
     vi.doMock('../utils/startupSync', () => ({
       ensureStartupSync,
+      setStartupSyncError: vi.fn(),
+    }))
+    vi.doMock('@tauri-apps/api/core', () => ({
+      invoke: vi.fn().mockResolvedValue('Engine started'),
     }))
 
     const { bootstrap } = await import('../main')

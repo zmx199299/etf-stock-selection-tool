@@ -3,7 +3,7 @@ import { createPinia } from 'pinia'
 import App from './App.vue'
 import router from './router'
 import { useColorModeStore } from './stores/colorMode'
-import { ensureStartupSync } from './utils/startupSync'
+import { ensureStartupSync, setStartupSyncError } from './utils/startupSync'
 import { invoke } from '@tauri-apps/api/core'
 import './style.css'
 import 'echarts'
@@ -22,6 +22,8 @@ export async function bootstrap() {
     await invoke('start_engine')
   } catch (e) {
     console.error('Failed to start engine:', e)
+    const msg = e instanceof Error ? e.message : String(e)
+    setStartupSyncError(`引擎启动失败: ${msg}`)
   }
 
   await ensureStartupSync()

@@ -1,6 +1,7 @@
 use serde::{Deserialize, Serialize};
+use std::fs;
 use std::io::{BufRead, BufReader, Write};
-use std::process::{Child, Command, Stdio};
+use std::process::{Child, ChildStdout, Command, Stdio};
 use tauri::{path::BaseDirectory, Manager};
 
 #[derive(Serialize)]
@@ -27,6 +28,7 @@ impl JsonRpcResponse {
 
 pub struct EngineManager {
     child: Option<Child>,
+    reader: Option<BufReader<ChildStdout>>,
     req_id: u64,
 }
 
@@ -34,6 +36,7 @@ impl EngineManager {
     pub fn new() -> Self {
         Self {
             child: None,
+            reader: None,
             req_id: 1,
         }
     }
@@ -78,19 +81,38 @@ impl EngineManager {
             c
         };
 
-        cmd.stdin(Stdio::piped())
-            .stdout(Stdio::piped())
-            .stderr(Stdio::inherit()); // Forward stderr to the terminal for debugging
+        cmd.stdin(Stdio::piped()).stdout(Stdio::piped());
 
-        let child = cmd
+        // 生产环境将 stderr 写入日志文件，方便诊断；开发环境直接输出到终端
+        if is_prod {
+            let home = dirs::home_dir().ok_or("Cannot determine home directory")?;
+            let log_dir = home.join(".etf-analyzer");
+            fs::create_dir_all(&log_dir).map_err(|e| format!("Failed to create log dir: {e}"))?;
+            let log_path = log_dir.join("engine.log");
+            let log_file = fs::File::create(&log_path)
+                .map_err(|e| format!("Failed to create engine log: {e}"))?;
+            cmd.stderr(Stdio::from(log_file));
+        } else {
+            cmd.stderr(Stdio::inherit());
+        }
+
+        let mut child = cmd
             .spawn()
             .map_err(|e| format!("Failed to spawn engine: {}", e))?;
+
+        // 从 child 中取出 stdout 并创建持久化的 BufReader，避免每次 invoke 重建导致数据丢失
+        let stdout = child
+            .stdout
+            .take()
+            .ok_or("Failed to get stdout from engine process")?;
+        self.reader = Some(BufReader::new(stdout));
         self.child = Some(child);
 
         Ok(())
     }
 
     pub fn stop(&mut self) -> Result<(), String> {
+        self.reader = None;
         if let Some(mut child) = self.child.take() {
             let _ = child.kill();
             let _ = child.wait();
@@ -123,9 +145,8 @@ impl EngineManager {
             .map_err(|e| e.to_string())?;
         stdin.flush().map_err(|e| e.to_string())?;
 
-        // Read from stdout
-        let stdout = child.stdout.as_mut().ok_or("Failed to get stdout")?;
-        let mut reader = BufReader::new(stdout);
+        // Read from stdout（使用持久化的 BufReader，避免丢失缓冲数据）
+        let reader = self.reader.as_mut().ok_or("Failed to get stdout reader")?;
         let mut line = String::new();
         reader.read_line(&mut line).map_err(|e| e.to_string())?;
 
@@ -152,8 +173,9 @@ mod tests {
     #[test]
     fn test_new_returns_empty_manager() {
         let manager = EngineManager::new();
-        // Fresh manager should have no child and req_id = 1
+        // Fresh manager should have no child, no reader, and req_id = 1
         assert!(manager.child.is_none());
+        assert!(manager.reader.is_none());
         assert_eq!(manager.req_id, 1);
     }
 
@@ -185,18 +207,21 @@ mod tests {
             .stdout(Stdio::piped())
             .stderr(Stdio::null());
 
-        let child = cmd.spawn().expect("sleep should exist");
+        let mut child = cmd.spawn().expect("sleep should exist");
+        let stdout = child.stdout.take().expect("stdout should be piped");
+        manager.reader = Some(BufReader::new(stdout));
         manager.child = Some(child);
 
-        // Child should be running
+        // Child and reader should be set
         assert!(manager.child.is_some());
+        assert!(manager.reader.is_some());
 
-        // Stop should succeed
+        // Stop should succeed and clean up both
         let result = manager.stop();
         assert!(result.is_ok());
 
-        // Child should be None after stop
         assert!(manager.child.is_none());
+        assert!(manager.reader.is_none());
     }
 
     #[test]
@@ -210,7 +235,9 @@ mod tests {
             .stdout(Stdio::piped())
             .stderr(Stdio::null());
 
-        let child = cmd.spawn().expect("sleep should exist");
+        let mut child = cmd.spawn().expect("sleep should exist");
+        let stdout = child.stdout.take().expect("stdout should be piped");
+        manager.reader = Some(BufReader::new(stdout));
         manager.child = Some(child);
 
         // Calling start again should be no-op (return Ok)
