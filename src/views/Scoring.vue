@@ -3,12 +3,20 @@
     <div class="header">
       <h1>技术评分</h1>
       <div class="search-bar">
-        <input type="text" class="search-input" placeholder="输入基金代码或名称..." />
-        <button class="btn-primary">分析</button>
+        <input v-model="searchCode" type="text" class="search-input" placeholder="输入基金代码..." @keyup.enter="handleSearch" />
+        <button class="btn-primary" @click="handleSearch">分析</button>
       </div>
     </div>
 
-    <div class="content" v-if="currentFund">
+    <div v-if="isLoading" class="loading-state">
+      <p>加载中...</p>
+    </div>
+    
+    <div v-else-if="errorMsg" class="error-state">
+      <p>{{ errorMsg }}</p>
+    </div>
+
+    <div class="content" v-else-if="currentFund">
       <div class="fund-info">
         <div class="fund-header">
           <h2>{{ currentFund.code }} - {{ currentFund.name }}</h2>
@@ -20,11 +28,11 @@
           </span>
         </div>
       </div>
-
+      
       <div class="score-card">
         <div class="score-display">
           <div class="score-circle">
-            <span class="score-value">{{ totalScore }}</span>
+            <span class="score-value">{{ currentFund.totalScore || totalScore }}</span>
           </div>
           <div class="score-label">综合评分</div>
           <div class="signal" :class="signalClass">{{ currentFund.signal }}</div>
@@ -33,65 +41,39 @@
         <div class="score-breakdown">
           <div class="score-item">
             <span class="item-label">趋势得分</span>
-            <div class="item-bar">
-              <div class="bar-fill" :style="{ width: currentFund.trendScore + '%' }"></div>
-            </div>
+            <div class="item-bar"><div class="bar-fill" :style="{ width: currentFund.trendScore + '%' }"></div></div>
             <span class="item-value">{{ currentFund.trendScore }}</span>
           </div>
           <div class="score-item">
             <span class="item-label">动量得分</span>
-            <div class="item-bar">
-              <div class="bar-fill" :style="{ width: currentFund.momentumScore + '%' }"></div>
-            </div>
+            <div class="item-bar"><div class="bar-fill" :style="{ width: currentFund.momentumScore + '%' }"></div></div>
             <span class="item-value">{{ currentFund.momentumScore }}</span>
           </div>
           <div class="score-item">
             <span class="item-label">波动得分</span>
-            <div class="item-bar">
-              <div class="bar-fill" :style="{ width: currentFund.volatilityScore + '%' }"></div>
-            </div>
+            <div class="item-bar"><div class="bar-fill" :style="{ width: currentFund.volatilityScore + '%' }"></div></div>
             <span class="item-value">{{ currentFund.volatilityScore }}</span>
           </div>
           <div class="score-item">
             <span class="item-label">量能得分</span>
-            <div class="item-bar">
-              <div class="bar-fill" :style="{ width: currentFund.volumeScore + '%' }"></div>
-            </div>
+            <div class="item-bar"><div class="bar-fill" :style="{ width: currentFund.volumeScore + '%' }"></div></div>
             <span class="item-value">{{ currentFund.volumeScore }}</span>
           </div>
         </div>
       </div>
-
+      
       <div class="card">
-        <div class="card-header">
-          <h3>K线图表</h3>
-        </div>
-        <div class="chart-placeholder">
-          <span>📈 ECharts 图表区域</span>
-        </div>
+        <div class="card-header"><h3>K线图表</h3></div>
+        <div class="chart-placeholder"><span>📈 ECharts 图表区域 (待接入真实数据)</span></div>
       </div>
 
       <div class="advice-card">
-        <div class="advice-header">
-          <h3>交易建议</h3>
-        </div>
+        <div class="advice-header"><h3>交易建议</h3></div>
         <div class="advice-content">
-          <div class="advice-item">
-            <span class="label">建议买入量</span>
-            <span class="value">{{ currentFund.adviceAmount }} 份</span>
-          </div>
-          <div class="advice-item">
-            <span class="label">预估费用</span>
-            <span class="value">¥{{ currentFund.estimateFee }}</span>
-          </div>
-          <div class="advice-item">
-            <span class="label">止损价</span>
-            <span class="value">¥{{ currentFund.stopLoss }}</span>
-          </div>
-          <div class="advice-item">
-            <span class="label">止盈价</span>
-            <span class="value">¥{{ currentFund.takeProfit }}</span>
-          </div>
+          <div class="advice-item"><span class="label">建议买入量</span><span class="value">{{ currentFund.adviceAmount }} 份</span></div>
+          <div class="advice-item"><span class="label">预估费用</span><span class="value">¥{{ currentFund.estimateFee }}</span></div>
+          <div class="advice-item"><span class="label">止损价</span><span class="value">¥{{ currentFund.stopLoss }}</span></div>
+          <div class="advice-item"><span class="label">止盈价</span><span class="value">¥{{ currentFund.takeProfit }}</span></div>
         </div>
       </div>
     </div>
@@ -101,62 +83,85 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 
-const isDev = import.meta.env.DEV
+const currentFund = ref<any>(null)
+const isLoading = ref(true)
+const errorMsg = ref('')
+const searchCode = ref('510300')
 
-const mockScoringData = {
-  code: '510300',
-  name: '沪深300ETF',
-  price: 4.123,
-  change: 1.25,
-  signal: '强烈看多',
-  trendScore: 80,
-  momentumScore: 75,
-  volatilityScore: 70,
-  volumeScore: 65,
-  adviceAmount: 24000,
-  estimateFee: 10.50,
-  stopLoss: 3.98,
-  takeProfit: 4.35,
+const fetchScoringData = async (code: string) => {
+  isLoading.value = true
+  errorMsg.value = ''
+  currentFund.value = null
+  try {
+    const { invoke } = await import('@tauri-apps/api/core')
+    const res: any = await invoke('invoke_engine', {
+      method: 'get_scoring_data',
+      params: { code }
+    })
+    
+    if (res && res.code) {
+      // Map snake_case to camelCase for the template
+      currentFund.value = {
+        code: res.code,
+        name: res.name,
+        price: res.price,
+        change: res.change,
+        signal: res.signal,
+        totalScore: res.total_score,
+        trendScore: res.trend_score,
+        momentumScore: res.momentum_score,
+        volatilityScore: res.volatility_score,
+        volumeScore: res.volume_score,
+        adviceAmount: res.advice_amount,
+        estimateFee: res.estimate_fee,
+        stopLoss: res.stop_loss,
+        takeProfit: res.take_profit
+      }
+    } else {
+      errorMsg.value = '未找到该基金的评分数据'
+    }
+  } catch (error: any) {
+    console.error('获取评分数据失败:', error)
+    errorMsg.value = `请求失败: ${error.message || String(error)}`
+  } finally {
+    isLoading.value = false
+  }
 }
 
-const currentFund = ref({ ...mockScoringData })
-
-const fetchScoringData = async () => {
-  try {
-    if (isDev) {
-      currentFund.value = mockScoringData
-    } else {
-      const { invoke } = await import('@tauri-apps/api/core')
-      const res: any = await invoke('invoke_engine', {
-        method: 'get_scoring_data',
-        params: { code: '510300' }
-      })
-      if (res) {
-        currentFund.value = res
-      }
-    }
-  } catch (error) {
-    console.error('获取评分数据失败:', error)
-    currentFund.value = mockScoringData
+const handleSearch = () => {
+  if (searchCode.value.trim()) {
+    fetchScoringData(searchCode.value.trim())
   }
 }
 
 onMounted(() => {
-  fetchScoringData();
+  fetchScoringData(searchCode.value)
 })
 
 const totalScore = computed(() => {
+  if (!currentFund.value) return 0
   const f = currentFund.value
   return Math.round((f.trendScore * 0.4 + f.momentumScore * 0.3 + f.volatilityScore * 0.1 + f.volumeScore * 0.2))
 })
 
 const signalClass = computed(() => {
+  if (!currentFund.value || !currentFund.value.signal) return ''
   const s = currentFund.value.signal
   return s.replace(/[\u4e00-\u9fa5]/g, '').toLowerCase()
 })
 </script>
 
 <style scoped>
+.loading-state, .error-state {
+  padding: 40px;
+  text-align: center;
+  color: #6b7280;
+  font-size: 16px;
+}
+.error-state {
+  color: #ef4444;
+}
+
 .scoring {
   padding: 24px;
 }
