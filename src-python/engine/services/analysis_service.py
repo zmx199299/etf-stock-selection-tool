@@ -551,8 +551,17 @@ class AnalysisService:
             price = float(quote_info[0][0])
             change = float(quote_info[0][1]) if len(quote_info[0]) > 1 and quote_info[0][1] is not None else 0.0
             
+        quotes = self.db.fetch_all("SELECT date, open, high, low, close, volume, amount, pct_chg FROM daily_quotes WHERE code = ? ORDER BY date DESC LIMIT 250", (code,))
+        
+        df = pd.DataFrame()
+        if quotes:
+            df = pd.DataFrame(quotes, columns=["date", "open", "high", "low", "close", "volume", "amount", "pct_chg"])
+            for col in ["open", "high", "low", "close", "volume", "amount", "pct_chg"]:
+                df[col] = pd.to_numeric(df[col], errors="coerce")
+            df = df.sort_values("date").reset_index(drop=True)
+            
         scorer = Scorer()
-        score_res = scorer.score(pd.DataFrame())
+        score_res = scorer.score(df)
         
         advice_amount = 0
         estimate_fee = 0.0

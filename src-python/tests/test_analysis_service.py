@@ -191,6 +191,7 @@ def test_get_scoring_data():
     db_mock.fetch_all.side_effect = [
         [("510300", "沪深300ETF")], # 基金基础信息
         [(4.0, 1.0)], # 最新日线, close=4.0
+        [("2024-01-01", 3.9, 4.1, 3.8, 4.0, 1000000, 4000000, 1.0), ("2024-01-02", 4.0, 4.2, 3.9, 4.1, 1200000, 4800000, 2.5)], # 历史行情
     ]
     
     service = AnalysisService(db_mock, indicators_mock, source_mock)
@@ -210,6 +211,12 @@ def test_get_scoring_data():
         }
         
         result = service.get_scoring_data("510300")
+        
+        instance.score.assert_called_once()
+        called_df = instance.score.call_args[0][0]
+        assert isinstance(called_df, pd.DataFrame)
+        assert len(called_df) == 2
+        assert list(called_df.columns) == ["date", "open", "high", "low", "close", "volume", "amount", "pct_chg"]
         
         assert result["code"] == "510300"
         assert result["name"] == "沪深300ETF"
