@@ -4,7 +4,7 @@ import os
 import threading
 from engine.server import create_real_server
 from engine.models.database import Database
-from engine.data.akshare_source import AkshareDataSource
+from engine.data.akshare_source import AkshareSource
 from engine.sync import DataSyncPipeline
 
 # Basic logging to stderr so it doesn't mess up JSON-RPC on stdout
@@ -37,9 +37,9 @@ def main():
     logger.info(f"Using database at: {db_path}")
 
     # 2. 初始化核心组件
-    # Database 的 __init__ 方法里已经自动包含了 self.init_db() 来创建所有空表
     db = Database(db_path)
-    source = AkshareDataSource()
+    db.init()  # 必须显式调用：连接数据库并创建表结构
+    source = AkshareSource()
 
     # 3. 检查数据库是否为空，如果为空，启动后台线程进行初始化同步
     try:
