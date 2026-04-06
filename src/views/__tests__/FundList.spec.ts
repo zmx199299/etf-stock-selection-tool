@@ -23,12 +23,84 @@ vi.mock('vue-router', () => ({
   }),
 }))
 
+const { sampleFunds } = vi.hoisted(() => ({
+  sampleFunds: [
+    {
+      code: '510300',
+      name: '沪深300ETF',
+      prevClose: 4.1,
+      open: 4.11,
+      close: 4.123,
+      high: 4.15,
+      low: 4.08,
+      volatility: 0.0172,
+      macd: { value: '金叉', signal: 'bullish' },
+      rsi: { value: '52', signal: 'bullish' },
+      boll: { value: '中轨', signal: 'bullish' },
+      ma5: { value: '上穿', signal: 'bullish' },
+      ma20: { value: '粘合', signal: 'bullish' },
+      score: 9,
+    },
+    {
+      code: '159915',
+      name: '创业板ETF',
+      prevClose: 1,
+      open: 0.99,
+      close: 0.97,
+      high: 1.01,
+      low: 0.96,
+      volatility: 5,
+      macd: { value: '绿柱', signal: 'bearish' },
+      rsi: { value: '25', signal: 'bearish' },
+      boll: { value: '上轨', signal: 'bearish' },
+      ma5: { value: '空头', signal: 'bearish' },
+      ma20: { value: '向下', signal: 'bearish' },
+      score: 1,
+    },
+    {
+      code: '512100',
+      name: '中证1000ETF',
+      prevClose: 1,
+      open: 1,
+      close: 1,
+      high: 1,
+      low: 1,
+      volatility: 1,
+      macd: { value: '金叉', signal: 'bullish' },
+      rsi: { value: '52', signal: 'bullish' },
+      boll: { value: '中轨', signal: 'bullish' },
+      ma5: { value: '上穿', signal: 'bullish' },
+      ma20: { value: '粘合', signal: 'bullish' },
+      score: 7,
+    },
+    {
+      code: '512480',
+      name: '半导体ETF',
+      prevClose: 1,
+      open: 1,
+      close: 1,
+      high: 1,
+      low: 1,
+      volatility: 1,
+      macd: { value: '绿柱', signal: 'bearish' },
+      rsi: { value: '25', signal: 'bearish' },
+      boll: { value: '上轨', signal: 'bearish' },
+      ma5: { value: '空头', signal: 'bearish' },
+      ma20: { value: '向下', signal: 'bearish' },
+      score: 2,
+    },
+  ]
+}))
+
+vi.mock('@tauri-apps/api/core', () => ({
+  invoke: vi.fn().mockResolvedValue(sampleFunds),
+}))
+
 describe('FundList', () => {
   beforeEach(() => {
     localStorage.clear()
     pushMock.mockReset()
     openMock.mockReset()
-    vi.resetModules()
     vi.unstubAllEnvs()
     setActivePinia(createPinia())
     vi.stubGlobal('open', openMock)
@@ -36,7 +108,6 @@ describe('FundList', () => {
 
   afterEach(() => {
     vi.doUnmock('../../utils/startupSync')
-    vi.doUnmock('@tauri-apps/api/core')
     vi.unstubAllEnvs()
     vi.unstubAllGlobals()
     vi.clearAllMocks()
@@ -44,6 +115,7 @@ describe('FundList', () => {
 
   it('搜索创业板后只显示匹配基金', async () => {
     const wrapper = mount(FundList)
+    await flushPromises()
 
     const searchInput = wrapper.get('[data-test="fund-search"]')
     await searchInput.setValue('创业板')
@@ -52,16 +124,18 @@ describe('FundList', () => {
     expect(wrapper.text()).not.toContain('沪深300ETF')
   })
 
-  it('大屏容器不会被固定最大宽度限制', () => {
+  it('大屏容器不会被固定最大宽度限制', async () => {
     const wrapper = mount(FundList)
+    await flushPromises()
     const shell = wrapper.get('section > div')
 
     expect(shell.classes()).not.toContain('max-w-7xl')
     expect(shell.classes()).toContain('w-full')
   })
 
-  it('顶部文案使用全量监测口径', () => {
+  it('顶部文案使用全量监测口径', async () => {
     const wrapper = mount(FundList)
+    await flushPromises()
 
     expect(wrapper.text()).toContain('全量场内基金（不含货币/债券基金）')
     expect(wrapper.text()).toContain('共监测4支')
@@ -69,8 +143,9 @@ describe('FundList', () => {
     expect(wrapper.text()).not.toContain('支持代码和名称搜索')
   })
 
-  it('第二页顶部栏采用固定框架，右侧控制区宽度固定为统一基线', () => {
+  it('第二页顶部栏采用固定框架，右侧控制区宽度固定为统一基线', async () => {
     const wrapper = mount(FundList)
+    await flushPromises()
 
     expect(wrapper.get('[data-test="fund-shell"]').classes()).toEqual(
       expect.arrayContaining(['min-h-full', 'bg-slate-50', 'p-4', 'md:p-6']),
@@ -94,6 +169,7 @@ describe('FundList', () => {
 
   it('切换到 intl 模式会同步更新 store 和 localStorage', async () => {
     const wrapper = mount(FundList)
+    await flushPromises()
     const colorModeStore = useColorModeStore()
 
     await wrapper.get('[data-test="mode-intl"]').trigger('click')
@@ -104,6 +180,7 @@ describe('FundList', () => {
 
   it('波动率按后端比率数据转换为百分比显示，并随共享颜色模式切换上涨语义类名', async () => {
     const wrapper = mount(FundList)
+    await flushPromises()
     const changeCell = wrapper.get('[data-test="change-510300"]')
 
     expect(wrapper.text()).toContain('1.72%')
@@ -116,6 +193,7 @@ describe('FundList', () => {
 
   it('点击代码名称区域会打开雪球详情页', async () => {
     const wrapper = mount(FundList)
+    await flushPromises()
 
     await wrapper.get('[data-test="xueqiu-510300"]').trigger('click')
 
@@ -124,6 +202,7 @@ describe('FundList', () => {
 
   it('点击详情分析会跳转到 analysis 路由', async () => {
     const wrapper = mount(FundList)
+    await flushPromises()
 
     await wrapper.get('[data-test="detail-510300"]').trigger('click')
 
@@ -135,6 +214,7 @@ describe('FundList', () => {
 
   it('详情分析跳转会携带 code 查询参数，供第三页直接进入详情态', async () => {
     const wrapper = mount(FundList)
+    await flushPromises()
 
     await wrapper.get('[data-test="detail-159915"]').trigger('click')
 
@@ -146,6 +226,7 @@ describe('FundList', () => {
 
   it('搜索无结果时显示空状态文案', async () => {
     const wrapper = mount(FundList)
+    await flushPromises()
 
     await wrapper.get('[data-test="fund-search"]').setValue('不存在的关键词')
 

@@ -140,6 +140,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
+import { invoke } from '@tauri-apps/api/core'
 
 import { useColorModeStore } from '../stores/colorMode'
 import { ensureStartupSync, getStartupSyncState } from '../utils/startupSync'
@@ -216,14 +217,8 @@ function openXueqiu(code: string) {
 
 async function fetchFunds() {
   try {
-    if (import.meta.env.MODE === 'test' || import.meta.env.DEV) {
-      funds.value = []
-      return
-    }
-
     await ensureStartupSync()
     startupSyncMessage.value = toStartupSyncAlertMessage()
-    const { invoke } = await import('@tauri-apps/api/core')
     const response = await invoke<FundListItem[]>('invoke_engine', {
       method: 'get_fund_list',
       params: {},
