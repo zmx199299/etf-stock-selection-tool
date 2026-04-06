@@ -34,6 +34,12 @@
 - **关于卡片**：2x2 网格展示 FUNDFLOW、v0.0.1 预览版、GPLv3、联网行为。
 - **隐私与免责声明卡片**：三段声明（蓝/黄/红圆点标识）。
 
+### Page 5 — 评分详情 (Scoring) ✅ 新完成真实化
+- `Scoring.vue` 页面已彻底移除假数据 `mockScoringData`。
+- **技术打分**：已对接真实后端 `AnalysisService.get_scoring_data`，获取并展示 `trend_score`, `momentum_score`, `volatility_score`, `volume_score` 及信号（目前后端 Scorer 采用基础策略或固定分值，保留算法升级空间）。
+- **交易建议**：后端动态计算建议买入量（预设按10000元基础投资）、预估费用、止损价（95%）和止盈价（110%）。
+- **交互与测试**：新增 `isLoading` 和 `errorMsg`，`Scoring.spec.ts`、Python的 `test_analysis_service.py` 均更新了对真实 `invoke_engine` 路由和策略逻辑的断言。
+
 ### 基础设施
 - `useColorModeStore()` — 全局红多/绿多配色管理，localStorage 持久化。
 - `useDisplaySettingsStore()` — 全局卡片数量设置管理，localStorage 持久化。
