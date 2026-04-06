@@ -66,34 +66,24 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 
-const isDev = import.meta.env.DEV
-
 const results = ref<any[]>([])
-
-const mockResults = [
-  { code: '510300', name: '沪深300ETF', pattern: 'V型反转', strength: 85, price: 4.123 },
-  { code: '159915', name: '创业板ETF', pattern: 'V型反转', strength: 92, price: 2.256 },
-  { code: '510500', name: '中证500ETF', pattern: 'V型反转', strength: 70, price: 6.789 },
-  { code: '588000', name: '科创50ETF', pattern: 'V型反转', strength: 78, price: 1.023 }
-]
+const error = ref<string>('')
 
 const fetchScreeningResults = async () => {
   try {
-    if (isDev) {
-      results.value = mockResults
-    } else {
-      const { invoke } = await import('@tauri-apps/api/core')
-      const res: any = await invoke('invoke_engine', {
-        method: 'get_screening_results',
-        params: {}
-      })
-      if (res && Array.isArray(res)) {
-        results.value = res
-      }
+    error.value = ''
+    const { invoke } = await import('@tauri-apps/api/core')
+    const res: any = await invoke('invoke_engine', {
+      method: 'get_screening_results',
+      params: {}
+    })
+    if (res && Array.isArray(res)) {
+      results.value = res
     }
-  } catch (error) {
-    console.error('获取筛选结果失败:', error)
-    results.value = mockResults
+  } catch (e) {
+    console.error('Screening failed:', e)
+    error.value = e instanceof Error ? e.message : String(e)
+    results.value = []
   }
 }
 
