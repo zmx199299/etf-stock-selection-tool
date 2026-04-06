@@ -153,75 +153,8 @@ import {
 const router = useRouter()
 const colorMode = useColorModeStore()
 
-const mockFunds: FundListItem[] = [
-  {
-    code: '510300',
-    name: '沪深300ETF',
-    prevClose: 4.1,
-    open: 4.105,
-    close: 4.123,
-    high: 4.15,
-    low: 4.08,
-    volatility: (4.15 - 4.08) / 4.08,
-    macd: { signal: 'bullish', value: '金叉' },
-    rsi: { signal: 'neutral', value: '52' },
-    boll: { signal: 'bullish', value: '中轨' },
-    ma5: { signal: 'bullish', value: '上穿' },
-    ma20: { signal: 'neutral', value: '粘合' },
-    score: 9,
-  },
-  {
-    code: '159915',
-    name: '创业板ETF',
-    prevClose: 2.24,
-    open: 2.245,
-    close: 2.256,
-    high: 2.28,
-    low: 2.23,
-    volatility: (2.28 - 2.23) / 2.23,
-    macd: { signal: 'bullish', value: '红柱' },
-    rsi: { signal: 'bullish', value: '68' },
-    boll: { signal: 'bullish', value: '下轨' },
-    ma5: { signal: 'bullish', value: '多头' },
-    ma20: { signal: 'bullish', value: '向上' },
-    score: 10,
-  },
-  {
-    code: '510500',
-    name: '中证500ETF',
-    prevClose: 6.8,
-    open: 6.79,
-    close: 6.789,
-    high: 6.82,
-    low: 6.75,
-    volatility: (6.82 - 6.75) / 6.75,
-    macd: { signal: 'bearish', value: '死叉' },
-    rsi: { signal: 'neutral', value: '48' },
-    boll: { signal: 'neutral', value: '中轨' },
-    ma5: { signal: 'bearish', value: '下穿' },
-    ma20: { signal: 'neutral', value: '粘合' },
-    score: 3,
-  },
-  {
-    code: '588000',
-    name: '科创50ETF',
-    prevClose: 1.05,
-    open: 1.045,
-    close: 1.03,
-    high: 1.06,
-    low: 1.02,
-    volatility: (1.06 - 1.02) / 1.02,
-    macd: { signal: 'bearish', value: '绿柱' },
-    rsi: { signal: 'bearish', value: '25' },
-    boll: { signal: 'bearish', value: '上轨' },
-    ma5: { signal: 'bearish', value: '空头' },
-    ma20: { signal: 'bearish', value: '向下' },
-    score: 1,
-  },
-]
-
 const keyword = ref('')
-const funds = ref<FundListItem[]>(import.meta.env.MODE === 'test' ? [...mockFunds] : [])
+const funds = ref<FundListItem[]>([])
 const startupSyncMessage = ref('')
 const isInitialLoading = ref(import.meta.env.MODE !== 'test')
 
@@ -284,7 +217,7 @@ function openXueqiu(code: string) {
 async function fetchFunds() {
   try {
     if (import.meta.env.MODE === 'test' || import.meta.env.DEV) {
-      funds.value = mockFunds
+      funds.value = []
       return
     }
 
@@ -296,9 +229,9 @@ async function fetchFunds() {
       params: {},
     })
 
-    funds.value = Array.isArray(response) ? response : mockFunds
+    funds.value = Array.isArray(response) ? response : []
   } catch {
-    funds.value = mockFunds
+    funds.value = []
   } finally {
     isInitialLoading.value = false
   }
