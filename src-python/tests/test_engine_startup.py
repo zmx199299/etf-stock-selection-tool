@@ -294,3 +294,132 @@ class TestBackgroundSyncTrigger:
             # 关键断言：后台同步线程应该被创建并启动
             mock_thread_class.assert_called_once()
             mock_thread.start.assert_called_once()
+
+
+class TestSyncNeedsRetry:
+    """验证部分同步失败后的重试检测"""
+
+    def test_needs_sync_when_coverage_too_low(self, tmp_path):
+        """有基金列表 1754 只但只有 500 只有日线数据时，应判定需要重新同步"""
+        db = Database(str(tmp_path / "test.db"))
+        db.init()
+
+        # 插入 10 只基金
+        funds = []
+        for i in range(10):
+            funds.append(
+                {
+                    "code": f"5103{i:02d}",
+                    "name": f"测试ETF{i}",
+                    "fund_type": "ETF",
+                    "invest_type": "指数型",
+                    "t_plus": "T+1",
+                    "list_date": "",
+                    "is_excluded": 0,
+                    "has_market_data": 1,
+                }
+            )
+        db.upsert_fund_info(funds)
+
+        # 只给 3 只基金插入日线数据（30% 覆盖率）
+        for i in range(3):
+            db.upsert_daily_quotes(
+                [
+                    {
+                        "code": f"5103{i:02d}",
+                        "date": "2026-04-01",
+                        "open": 4.0,
+                        "close": 4.1,
+                        "high": 4.2,
+                        "low": 3.9,
+                        "volume": 1000,
+                        "amount": 4100,
+                        "nav": None,
+                        "premium_rate": None,
+                        "prev_close": None,
+                        "is_suspended": 0,
+                        "suspended_days": 0,
+                    }
+                ]
+            )
+
+        # 30% 覆盖率 < 80% 阈值，应该需要重新同步
+        assert db.needs_background_sync() is True
+        db.close()
+
+    def test_no_sync_when_coverage_sufficient(self, tmp_path):
+        """90% 覆盖率应判定不需要重新同步"""
+        db = Database(str(tmp_path / "test.db"))
+        db.init()
+
+        # 插入 10 只基金
+        funds = []
+        for i in range(10):
+            funds.append(
+                {
+                    "code": f"5103{i:02d}",
+                    "name": f"测试ETF{i}",
+                    "fund_type": "ETF",
+                    "invest_type": "指数型",
+                    "t_plus": "T+1",
+                    "list_date": "",
+                    "is_excluded": 0,
+                    "has_market_data": 1,
+                }
+            )
+        db.upsert_fund_info(funds)
+
+        # 给 9 只基金插入日线数据（90% 覆盖率）
+        for i in range(9):
+            db.upsert_daily_quotes(
+                [
+                    {
+                        "code": f"5103{i:02d}",
+                        "date": "2026-04-01",
+                        "open": 4.0,
+                        "close": 4.1,
+                        "high": 4.2,
+                        "low": 3.9,
+                        "volume": 1000,
+                        "amount": 4100,
+                        "nav": None,
+                        "premium_rate": None,
+                        "prev_close": None,
+                        "is_suspended": 0,
+                        "suspended_days": 0,
+                    }
+                ]
+            )
+
+        # 90% >= 80% 阈值，不需要重新同步
+        assert db.needs_background_sync() is False
+        db.close()
+
+    def test_sync_needed_when_no_daily_quotes_at_all(self, tmp_path):
+        """完全没有日线数据时应需要同步"""
+        db = Database(str(tmp_path / "test.db"))
+        db.init()
+        # 空数据库
+        assert db.needs_background_sync() is True
+        db.close()
+
+    def test_sync_needed_when_fund_info_exists_but_no_quotes(self, tmp_path):
+        """有基金列表但无日线数据，应需要同步"""
+        db = Database(str(tmp_path / "test.db"))
+        db.init()
+        db.upsert_fund_info(
+            [
+                {
+                    "code": "510300",
+                    "name": "沪深300ETF",
+                    "fund_type": "ETF",
+                    "invest_type": "指数型",
+                    "t_plus": "T+1",
+                    "list_date": "",
+                    "is_excluded": 0,
+                    "has_market_data": 1,
+                }
+            ]
+        )
+        assert db.needs_background_sync() is True
+        db.close()

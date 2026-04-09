@@ -107,6 +107,14 @@ def _normalize_fund_code(value) -> str:
 
 
 class AkshareSource(DataSource):
+    def __init__(self, em_skip_threshold: int = 5):
+        """初始化数据源
+        Args:
+            em_skip_threshold: em 连续失败多少次后跳过 em 直接用 sina
+        """
+        self._em_consecutive_failures = 0
+        self._em_skip_threshold = em_skip_threshold
+
     # ------------------------------------------------------------------
     # 基金列表：多源并发，取数量多的
     # ------------------------------------------------------------------
@@ -259,11 +267,26 @@ class AkshareSource(DataSource):
     # ------------------------------------------------------------------
 
     def fetch_daily_quotes(self, code: str, start_date: str = None) -> list[dict]:
-        """先试东方财富日线，失败则 fallback 到新浪日线"""
+        """先试东方财富日线，失败则 fallback 到新浪日线。
+        em 连续失败超过阈值后自动跳过 em，直接用 sina，大幅减少同步耗时。"""
+        # em 连续失败过多次，跳过 em 直接用 sina
+        if self._em_consecutive_failures >= self._em_skip_threshold:
+            return self._fetch_daily_quotes_sina(code, start_date)
+
         # 第一优先：东方财富
         quotes = self._fetch_daily_quotes_em(code, start_date)
         if quotes:
+            # em 成功，重置失败计数
+            self._em_consecutive_failures = 0
             return quotes
+
+        # em 失败，计数 +1
+        self._em_consecutive_failures += 1
+        if self._em_consecutive_failures >= self._em_skip_threshold:
+            logger.warning(
+                f"em 数据源已连续失败 {self._em_consecutive_failures} 次，"
+                f"后续日线将跳过 em 直接使用 sina"
+            )
 
         # Fallback：新浪
         logger.info(f"[{code}] 东方财富日线为空或失败，尝试新浪源...")

@@ -49,16 +49,16 @@ def main():
     db.init()  # 必须显式调用：连接数据库并创建表结构
     source = AkshareSource()
 
-    # 3. 检查日线数据是否为空（覆盖"基金列表已存在但日线同步失败"的场景）
+    # 3. 检查是否需要后台同步（覆盖"部分同步崩溃"的场景：覆盖率不足 80%）
     try:
-        if not db.has_daily_quotes():
+        if db.needs_background_sync():
             sync_thread = threading.Thread(
                 target=background_sync, args=(db_path,), daemon=True
             )
             sync_thread.start()
             logger.info("Background sync thread started.")
         else:
-            logger.info("Daily quotes already exist, skipping background sync.")
+            logger.info("Daily quotes coverage sufficient, skipping background sync.")
     except Exception as e:
         logger.error(f"Failed to check db state: {e}")
 

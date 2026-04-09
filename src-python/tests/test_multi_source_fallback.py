@@ -268,3 +268,122 @@ class TestFetchDailyQuotesMultiSource:
             assert key in q, f"缺少字段: {key}"
         assert isinstance(q["open"], float)
         assert isinstance(q["close"], float)
+
+
+class TestEmSourceSkipAfterConsecutiveFailures:
+    """em 数据源连续失败后应跳过 em，直接使用 sina"""
+
+    @patch("engine.data.akshare_source.ak")
+    def test_skips_em_after_consecutive_failures(self, mock_ak):
+        """em 连续失败 N 次后，后续调用应直接跳过 em"""
+        from engine.data.akshare_source import AkshareSource
+
+        source = AkshareSource()
+
+        # em 始终失败
+        mock_ak.fund_etf_hist_em.side_effect = ConnectionError("Remote end closed")
+        # sina 始终成功
+        mock_ak.fund_etf_hist_sina.return_value = pd.DataFrame(
+            [
+                {
+                    "date": "2026-04-01",
+                    "open": 4.0,
+                    "close": 4.1,
+                    "high": 4.2,
+                    "low": 3.9,
+                    "volume": 10000,
+                    "amount": 41000,
+                },
+            ]
+        )
+
+        # 先让 em 失败足够多次触发跳过阈值（默认 5 次）
+        for i in range(5):
+            source.fetch_daily_quotes(f"51030{i}", start_date="2026-04-01")
+
+        # 重置 mock 调用计数
+        mock_ak.fund_etf_hist_em.reset_mock()
+        mock_ak.fund_etf_hist_sina.reset_mock()
+
+        # 第 6 次调用：em 应该被跳过，不再调用
+        source.fetch_daily_quotes("510300", start_date="2026-04-01")
+
+        mock_ak.fund_etf_hist_em.assert_not_called()
+        mock_ak.fund_etf_hist_sina.assert_called_once()
+
+    @patch("engine.data.akshare_source.ak")
+    def test_em_success_resets_failure_counter(self, mock_ak):
+        """em 成功一次后应重置失败计数器"""
+        from engine.data.akshare_source import AkshareSource
+
+        source = AkshareSource()
+
+        # em 先失败 3 次
+        mock_ak.fund_etf_hist_em.side_effect = ConnectionError("fail")
+        mock_ak.fund_etf_hist_sina.return_value = pd.DataFrame(
+            [
+                {
+                    "date": "2026-04-01",
+                    "open": 4.0,
+                    "close": 4.1,
+                    "high": 4.2,
+                    "low": 3.9,
+                    "volume": 10000,
+                    "amount": 41000,
+                },
+            ]
+        )
+        for i in range(3):
+            source.fetch_daily_quotes(f"51030{i}", start_date="2026-04-01")
+
+        # em 恢复正常
+        mock_ak.fund_etf_hist_em.side_effect = None
+        mock_ak.fund_etf_hist_em.return_value = pd.DataFrame(
+            [
+                {
+                    "日期": "2026-04-01",
+                    "开盘": 4.0,
+                    "收盘": 4.1,
+                    "最高": 4.2,
+                    "最低": 3.9,
+                    "成交量": 10000,
+                    "成交额": 41000,
+                },
+            ]
+        )
+        source.fetch_daily_quotes("510300", start_date="2026-04-01")
+
+        # em 失败计数应已重置，现在应该是 0
+        assert source._em_consecutive_failures == 0
+
+    @patch("engine.data.akshare_source.ak")
+    def test_em_skip_threshold_configurable(self, mock_ak):
+        """em 跳过阈值应可配置"""
+        from engine.data.akshare_source import AkshareSource
+
+        source = AkshareSource(em_skip_threshold=3)
+
+        mock_ak.fund_etf_hist_em.side_effect = ConnectionError("fail")
+        mock_ak.fund_etf_hist_sina.return_value = pd.DataFrame(
+            [
+                {
+                    "date": "2026-04-01",
+                    "open": 4.0,
+                    "close": 4.1,
+                    "high": 4.2,
+                    "low": 3.9,
+                    "volume": 10000,
+                    "amount": 41000,
+                },
+            ]
+        )
+
+        # 失败 3 次达到阈值
+        for i in range(3):
+            source.fetch_daily_quotes(f"51030{i}", start_date="2026-04-01")
+
+        mock_ak.fund_etf_hist_em.reset_mock()
+
+        # 第 4 次应跳过 em
+        source.fetch_daily_quotes("510300", start_date="2026-04-01")
+        mock_ak.fund_etf_hist_em.assert_not_called()

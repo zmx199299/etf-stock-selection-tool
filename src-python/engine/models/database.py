@@ -11,6 +11,8 @@ class Database:
     def init(self):
         self.conn = sqlite3.connect(self.db_path)
         self.conn.row_factory = sqlite3.Row
+        # 启用 WAL 模式：允许并发读写，避免后台同步线程与主线程冲突导致 "database is locked"
+        self.conn.execute("PRAGMA journal_mode=WAL")
         self._create_tables()
 
     def close(self):
@@ -138,6 +140,32 @@ class Database:
         c = self.conn.cursor()
         c.execute("SELECT 1 FROM daily_quote LIMIT 1")
         return c.fetchone() is not None
+
+    def needs_background_sync(self, min_coverage: float = 0.8) -> bool:
+        """判断是否需要后台同步。满足以下任一条件返回 True：
+        1. 完全没有日线数据
+        2. 有活跃基金，但日线数据覆盖率低于 min_coverage（默认 80%）
+
+        这解决了后台同步中途崩溃后部分数据无法被重新同步的问题。
+        """
+        if not self.has_daily_quotes():
+            return True
+
+        c = self.conn.cursor()
+        # 统计有行情数据的活跃基金总数
+        c.execute(
+            "SELECT COUNT(*) FROM fund_info WHERE is_excluded=0 AND has_market_data=1"
+        )
+        total_funds = c.fetchone()[0]
+        if total_funds == 0:
+            return True
+
+        # 统计有日线数据的不重复基金数
+        c.execute("SELECT COUNT(DISTINCT code) FROM daily_quote")
+        funds_with_quotes = c.fetchone()[0]
+
+        coverage = funds_with_quotes / total_funds
+        return coverage < min_coverage
 
     def upsert_daily_quotes(self, quotes: list[dict]):
         c = self.conn.cursor()
