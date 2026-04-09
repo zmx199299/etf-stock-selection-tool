@@ -1,0 +1,89 @@
+name: Daily Database Build
+
+on:
+  schedule:
+    # 每天 UTC 22:00（北京时间 06:00），交易日开盘前
+    - cron: "0 22 * * *"
+  workflow_dispatch:
+
+jobs:
+  build-database:
+    name: Generate Pre-built Database
+    runs-on: ubuntu-22.04
+    timeout-minutes: 120
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install TA-Lib C library
+        run: |
+          wget https://github.com/ta-lib/ta-lib/releases/download/v0.6.4/ta-lib-0.6.4-src.tar.gz
+          tar -xzf ta-lib-0.6.4-src.tar.gz
+          cd ta-lib-0.6.4/
+          ./configure --prefix=/usr
+          make
+          sudo make install
+          cd ..
+          rm -rf ta-lib-0.6.4 ta-lib-0.6.4-src.tar.gz
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: "pip"
+
+      - name: Install Python dependencies
+        run: |
+          python -m venv .venv
+          .venv/bin/pip install -r src-python/requirements.txt
+
+      - name: Generate database
+        run: |
+          mkdir -p data
+          .venv/bin/python src-python/sync_all.py --output data/etf_analyzer.db
+
+      - name: Compress database
+        run: |
+          DATE=$(date -u +%Y%m%d)
+          gzip -k data/etf_analyzer.db
+          mv data/etf_analyzer.db.gz "data/etf_analyzer_${DATE}.db.gz"
+          echo "DB_FILE=data/etf_analyzer_${DATE}.db.gz" >> "$GITHUB_ENV"
+          echo "DB_DATE=${DATE}" >> "$GITHUB_ENV"
+          echo "DB_SIZE=$(du -h data/etf_analyzer.db | cut -f1)" >> "$GITHUB_ENV"
+          echo "DB_GZ_SIZE=$(du -h data/etf_analyzer_${DATE}.db.gz | cut -f1)" >> "$GITHUB_ENV"
+
+      - name: Create or update database-latest release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="database-latest"
+
+          # 删除旧 release（如果存在），重新创建
+          gh release delete "$TAG" --yes 2>/dev/null || true
+          git tag -d "$TAG" 2>/dev/null || true
+          git push origin ":refs/tags/$TAG" 2>/dev/null || true
+
+          # 创建新 release
+          gh release create "$TAG" \
+            --title "预构建数据库 (${DB_DATE})" \
+            --notes "## ETF Analyzer 预构建数据库
+
+**生成日期:** ${DB_DATE}
+**原始大小:** ${DB_SIZE}
+**压缩大小:** ${DB_GZ_SIZE}
+
+### 包含数据
+- 全量场内 ETF/LOF 基金列表（排除货币/债券）
+- 全量历史日线行情（OHLCV）
+- 全量净值历史（NAV）
+
+### 使用方法
+1. 下载 \`etf_analyzer_${DB_DATE}.db.gz\`
+2. 解压: \`gzip -d etf_analyzer_${DB_DATE}.db.gz\`
+3. 将 \`etf_analyzer_${DB_DATE}.db\` 重命名为 \`etf_analyzer.db\`
+4. 放入 \`~/.etf-analyzer/\` 目录
+5. 启动应用即可使用
+
+> 此 Release 每天自动更新，下载链接始终指向最新版本。" \
+            "$DB_FILE"

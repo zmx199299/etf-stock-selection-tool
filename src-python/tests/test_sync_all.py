@@ -1,150 +1,137 @@
-from pathlib import Path
-import importlib.util
+# src-python/tests/test_sync_all.py
+"""sync_all.py 独立数据库生成脚本的单元测试（基于 DataSyncPipeline 重写版）"""
 
-from engine.models.database import Database
+import os
+import sys
+import tempfile
 
+import pytest
+from unittest.mock import patch, MagicMock, call
 
-def _load_sync_all_module():
-    module_path = Path(__file__).resolve().parents[1] / "sync_all.py"
-    spec = importlib.util.spec_from_file_location("sync_all_module", module_path)
-    module = importlib.util.module_from_spec(spec)
-    assert spec.loader is not None
-    spec.loader.exec_module(module)
-    return module
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 
-def test_sync_full_market_funds_persists_quotes_and_latest_nav(tmp_path, monkeypatch):
-    module = _load_sync_all_module()
+class TestParseArgs:
+    """测试命令行参数解析"""
 
-    monkeypatch.setattr(
-        module,
-        "load_name_rows",
-        lambda: [
-            {"基金代码": "510300", "基金简称": "沪深300ETF华泰柏瑞", "基金类型": "指数型-股票"},
-            {"基金代码": "161725", "基金简称": "招商中证白酒指数(LOF)A", "基金类型": "指数型-股票"},
-            {"基金代码": "159972", "基金简称": "5年地方债ETF鹏华", "基金类型": "指数型-固收"},
-        ],
-    )
-    monkeypatch.setattr(
-        module,
-        "load_etf_rows",
-        lambda: [
-            {"代码": "sh510300", "名称": "沪深300ETF华泰柏瑞", "最新价": 4.5, "成交量": 10000},
-            {"代码": "sz159972", "名称": "5年地方债ETF鹏华", "最新价": 1.0, "成交量": 5000},
-        ],
-    )
-    monkeypatch.setattr(
-        module,
-        "load_lof_rows",
-        lambda: [{"代码": "sz161725", "名称": "招商中证白酒指数LOF", "最新价": 0.64, "成交量": 8000}],
-    )
-    monkeypatch.setattr(module, "load_fallback_details", lambda: {})
-    monkeypatch.setattr(
-        module,
-        "fetch_market_quotes",
-        lambda code: [
-            {
-                "code": code,
-                "date": "2026-04-03",
-                "open": 1.0,
-                "close": 1.1,
-                "high": 1.2,
-                "low": 0.9,
-                "volume": 1000.0,
-                "amount": 2000.0,
-                "nav": None,
-                "premium_rate": None,
-                "prev_close": 0.95,
-                "is_suspended": 0,
-                "suspended_days": 0,
+    def test_no_args_returns_none_output(self):
+        """无参数时 output 应为 None（使用默认路径）"""
+        from sync_all import parse_args
+
+        args = parse_args([])
+        assert args.output is None
+
+    def test_custom_output_path(self):
+        """--output 参数应正确解析"""
+        from sync_all import parse_args
+
+        args = parse_args(["--output", "/tmp/custom.db"])
+        assert args.output == "/tmp/custom.db"
+
+
+class TestDefaultDbPath:
+    """测试默认数据库路径"""
+
+    def test_default_path_ends_with_data_dir(self):
+        """默认路径应指向项目根目录的 data/etf_analyzer.db"""
+        from sync_all import DEFAULT_DB_PATH
+
+        assert DEFAULT_DB_PATH.endswith(os.path.join("data", "etf_analyzer.db"))
+
+
+class TestMainFlow:
+    """测试 main() 函数的完整流程"""
+
+    def _run_main_with_mock(self, db_path, sync_return=None, sync_side_effect=None):
+        """辅助方法：使用 mock 运行 main()"""
+        if sync_return is None:
+            sync_return = {
+                "funds_synced": 10,
+                "quotes_synced": 100,
+                "nav_updated": 5,
             }
-        ],
-    )
-    monkeypatch.setattr(
-        module,
-        "load_latest_nav_snapshots",
-        lambda: {
-            "510300": {"date": "2026-04-03", "nav": 4.4499, "premium_rate": 0.0009},
-            "161725": {"date": "2026-04-03", "nav": 0.6393, "premium_rate": None},
-        },
-    )
 
-    db = Database(str(tmp_path / "full.db"))
-    db.init()
-    try:
-        fund_count, quotes_count, nav_count, skipped_count = module.sync_full_market_funds(db)
-        assert fund_count == 2
-        assert quotes_count == 2
-        assert nav_count == 2
-        assert skipped_count == 0
+        mock_pipeline = MagicMock()
+        if sync_side_effect:
+            mock_pipeline.sync_all.side_effect = sync_side_effect
+        else:
+            mock_pipeline.sync_all.return_value = sync_return
 
-        funds = db.get_all_active_funds()
-        codes = [item["code"] for item in funds]
-        assert codes == ["161725", "510300"]
+        mock_db = MagicMock()
 
-        quotes = db.get_daily_quotes("510300", "2026-04-03", "2026-04-03")
-        assert len(quotes) == 1
-        assert quotes[0]["nav"] == 4.4499
-        assert quotes[0]["premium_rate"] == 0.0009
+        with patch("sys.argv", ["sync_all.py", "--output", db_path]):
+            with patch("sync_all.Database", return_value=mock_db) as mock_db_cls:
+                with patch(
+                    "sync_all.AkshareSource", return_value=MagicMock()
+                ) as mock_source_cls:
+                    with patch(
+                        "sync_all.DataSyncPipeline", return_value=mock_pipeline
+                    ) as mock_pipeline_cls:
+                        from sync_all import main
 
-        nav_rows = db.get_fund_nav_history("161725", "2026-04-03", "2026-04-03")
-        assert len(nav_rows) == 1
-        assert nav_rows[0]["nav"] == 0.6393
-    finally:
-        db.close()
+                        main()
 
+        return mock_db, mock_db_cls, mock_source_cls, mock_pipeline_cls, mock_pipeline
 
-def test_sync_skips_funds_without_market_data(tmp_path, monkeypatch):
-    module = _load_sync_all_module()
+    def test_creates_output_directory(self):
+        """main() 应自动创建输出目录（如果不存在）"""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            db_path = os.path.join(tmpdir, "subdir", "nested", "test.db")
+            self._run_main_with_mock(db_path)
+            assert os.path.isdir(os.path.join(tmpdir, "subdir", "nested"))
 
-    monkeypatch.setattr(
-        module,
-        "load_name_rows",
-        lambda: [
-            {"基金代码": "510300", "基金简称": "沪深300ETF华泰柏瑞", "基金类型": "指数型-股票"},
-            {"基金代码": "160137", "基金简称": "南方中证互联网指数(LOF)A", "基金类型": "指数型-股票"},
-        ],
-    )
-    monkeypatch.setattr(
-        module,
-        "load_etf_rows",
-        lambda: [{"代码": "sh510300", "名称": "沪深300ETF华泰柏瑞", "最新价": 4.5, "成交量": 10000}],
-    )
-    monkeypatch.setattr(
-        module,
-        "load_lof_rows",
-        lambda: [{"代码": "sz160137", "名称": "互联基金", "最新价": 0.0, "成交量": 0}],
-    )
-    monkeypatch.setattr(module, "load_fallback_details", lambda: {})
+    def test_initializes_database(self):
+        """main() 应初始化数据库（调用 db.init()）"""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            db_path = os.path.join(tmpdir, "test.db")
+            mock_db, *_ = self._run_main_with_mock(db_path)
+            mock_db.init.assert_called_once()
 
-    fetch_calls = []
+    def test_calls_sync_all_without_limit(self):
+        """main() 应调用 pipeline.sync_all(limit_days=None) 拉取全量历史"""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            db_path = os.path.join(tmpdir, "test.db")
+            *_, mock_pipeline = self._run_main_with_mock(db_path)
+            mock_pipeline.sync_all.assert_called_once_with(limit_days=None)
 
-    def mock_fetch(code):
-        fetch_calls.append(code)
-        return [{"code": code, "date": "2026-04-03", "open": 1.0, "close": 1.1, "high": 1.2, "low": 0.9, "volume": 1000.0, "amount": 2000.0, "nav": None, "premium_rate": None, "prev_close": 0.95, "is_suspended": 0, "suspended_days": 0}]
+    def test_creates_pipeline_with_db_and_source(self):
+        """main() 应用 Database 和 AkshareSource 创建 DataSyncPipeline"""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            db_path = os.path.join(tmpdir, "test.db")
+            mock_db, _, mock_source_cls, mock_pipeline_cls, _ = (
+                self._run_main_with_mock(db_path)
+            )
+            # DataSyncPipeline 应该用 db 和 source 实例创建
+            mock_pipeline_cls.assert_called_once()
+            args = mock_pipeline_cls.call_args
+            assert args[0][0] is mock_db  # 第一个参数是 db
+            assert args[0][1] is mock_source_cls.return_value  # 第二个参数是 source
 
-    monkeypatch.setattr(module, "fetch_market_quotes", mock_fetch)
-    monkeypatch.setattr(
-        module,
-        "load_latest_nav_snapshots",
-        lambda: {
-            "510300": {"date": "2026-04-03", "nav": 4.4499, "premium_rate": 0.0009},
-            "160137": {"date": "2026-04-03", "nav": 1.5894, "premium_rate": None},
-        },
-    )
+    def test_closes_db_after_success(self):
+        """同步成功后应关闭数据库连接"""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            db_path = os.path.join(tmpdir, "test.db")
+            mock_db, *_ = self._run_main_with_mock(db_path)
+            mock_db.close.assert_called_once()
 
-    db = Database(str(tmp_path / "skip_test.db"))
-    db.init()
-    try:
-        fund_count, quotes_count, nav_count, skipped_count = module.sync_full_market_funds(db)
-        assert fund_count == 2
-        assert quotes_count == 1
-        assert nav_count == 2
-        assert skipped_count == 1
-        assert fetch_calls == ["510300"]
-        assert "160137" not in fetch_calls
+    def test_closes_db_on_error(self):
+        """即使 sync_all 抛异常，数据库也应被关闭"""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            db_path = os.path.join(tmpdir, "test.db")
 
-        fund_160137 = db.get_fund_info("160137")
-        assert fund_160137["has_market_data"] == 0
-    finally:
-        db.close()
+            mock_pipeline = MagicMock()
+            mock_pipeline.sync_all.side_effect = RuntimeError("网络异常")
+            mock_db = MagicMock()
+
+            with patch("sys.argv", ["sync_all.py", "--output", db_path]):
+                with patch("sync_all.Database", return_value=mock_db):
+                    with patch("sync_all.AkshareSource", return_value=MagicMock()):
+                        with patch(
+                            "sync_all.DataSyncPipeline", return_value=mock_pipeline
+                        ):
+                            from sync_all import main
+
+                            with pytest.raises(RuntimeError, match="网络异常"):
+                                main()
+
+            mock_db.close.assert_called_once()
