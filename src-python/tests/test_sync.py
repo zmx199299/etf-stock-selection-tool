@@ -127,6 +127,91 @@ def test_sync_skips_excluded_funds(mock_env):
     assert "513050" in codes
 
 
+class NavExplodingSource:
+    """模拟某些基金的 fetch_nav 会抛异常（如 NaN 导致数据库约束错误）"""
+
+    def __init__(self, exploding_codes: set):
+        self.exploding_codes = exploding_codes
+
+    def fetch_fund_list(self):
+        return [
+            {
+                "code": "510300",
+                "name": "沪深300ETF",
+                "fund_type": "ETF",
+                "invest_type": "指数型",
+                "t_plus": "T+1",
+                "list_date": "2012-05-28",
+                "is_excluded": 0,
+            },
+            {
+                "code": "159915",
+                "name": "创业板ETF",
+                "fund_type": "ETF",
+                "invest_type": "指数型",
+                "t_plus": "T+1",
+                "list_date": "2010-02-11",
+                "is_excluded": 0,
+            },
+            {
+                "code": "510500",
+                "name": "中证500ETF",
+                "fund_type": "ETF",
+                "invest_type": "指数型",
+                "t_plus": "T+1",
+                "list_date": "2013-02-06",
+                "is_excluded": 0,
+            },
+        ]
+
+    def fetch_daily_quotes(self, code: str, start_date: str = None):
+        return [
+            {
+                "date": "2026-04-01",
+                "open": 4.0,
+                "close": 4.1,
+                "high": 4.2,
+                "low": 3.9,
+                "volume": 10000,
+                "amount": 41000,
+            }
+        ]
+
+    def fetch_nav(self, code: str, start_date: str = None):
+        if code in self.exploding_codes:
+            # 模拟因 NaN 值导致的数据库写入异常
+            raise Exception(
+                f"NOT NULL constraint failed: fund_nav_history.nav (code={code})"
+            )
+        return [{"date": "2026-04-01", "nav": 4.118}]
+
+
+def test_sync_nav_resilient_to_per_fund_errors(tmp_path):
+    """sync_nav_for_all() 某只基金出错时不应崩溃整个 NAV 同步"""
+    db_path = str(tmp_path / "test.db")
+    db = Database(db_path)
+    db.init()
+
+    # 159915 的 NAV 会抛异常，但其他基金应继续同步
+    source = NavExplodingSource(exploding_codes={"159915"})
+    pipeline = DataSyncPipeline(db, source)
+    pipeline.sync_fund_list()
+    pipeline.sync_daily_quotes_for_all()
+
+    # 不应崩溃
+    nav_count = pipeline.sync_nav_for_all()
+
+    # 应该至少同步了 510300 和 510500 的 NAV（159915 失败被跳过）
+    assert nav_count >= 2
+
+    # 验证正常基金的 NAV 确实写入了
+    nav_history = db.get_fund_nav_history("510300", "2026-04-01", "2026-04-01")
+    assert len(nav_history) == 1
+    assert nav_history[0]["nav"] == pytest.approx(4.118, abs=0.001)
+
+    db.close()
+
+
 class AlwaysFailSource:
     """模拟所有数据源都失败的情况"""
 

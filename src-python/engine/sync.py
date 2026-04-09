@@ -73,17 +73,21 @@ class DataSyncPipeline:
         updated = 0
         for fund in funds:
             code = fund["code"]
-            nav_data = self.source.fetch_nav(code)
-            if not nav_data:
+            try:
+                nav_data = self.source.fetch_nav(code)
+                if not nav_data:
+                    continue
+                history_rows = []
+                for nav_item in nav_data:
+                    date = nav_item["date"]
+                    nav = nav_item["nav"]
+                    history_rows.append({"code": code, "date": date, "nav": nav})
+                    self.db._update_nav(code, date, nav)
+                    updated += 1
+                self.db.upsert_fund_nav_history(history_rows)
+            except Exception as e:
+                logger.warning(f"同步基金 {code} 净值失败，跳过: {e}")
                 continue
-            history_rows = []
-            for nav_item in nav_data:
-                date = nav_item["date"]
-                nav = nav_item["nav"]
-                history_rows.append({"code": code, "date": date, "nav": nav})
-                self.db._update_nav(code, date, nav)
-                updated += 1
-            self.db.upsert_fund_nav_history(history_rows)
         logger.info(f"Updated nav for {updated} records")
         return updated
 

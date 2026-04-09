@@ -366,7 +366,7 @@ class AkshareSource(DataSource):
             if start_date and date_str < start_date:
                 continue
             nav_val = row.get("单位净值", None)
-            if nav_val is not None:
+            if pd.notna(nav_val):
                 results.append({"date": date_str, "nav": float(nav_val)})
         return results
 

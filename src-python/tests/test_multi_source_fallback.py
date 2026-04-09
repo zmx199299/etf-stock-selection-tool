@@ -270,6 +270,53 @@ class TestFetchDailyQuotesMultiSource:
         assert isinstance(q["close"], float)
 
 
+class TestFetchNavFiltersNaN:
+    """fetch_nav 应过滤掉 NaN 净值，避免 NOT NULL 约束冲突"""
+
+    @patch("engine.data.akshare_source.ak")
+    def test_nan_nav_values_are_filtered_out(self, mock_ak):
+        """当 akshare 返回的单位净值包含 NaN 时，应被过滤掉而非传递到数据库"""
+        import numpy as np
+        from engine.data.akshare_source import AkshareSource
+
+        # 模拟 akshare 返回包含 NaN 净值的数据（真实场景中确实会出现）
+        mock_ak.fund_etf_fund_info_em.return_value = pd.DataFrame(
+            [
+                {"净值日期": "2026-04-01", "单位净值": 4.118},
+                {"净值日期": "2026-04-02", "单位净值": np.nan},  # NaN 值
+                {"净值日期": "2026-04-03", "单位净值": 4.125},
+                {"净值日期": "2026-04-04", "单位净值": None},  # None 值
+                {"净值日期": "2026-04-05", "单位净值": float("nan")},  # float nan
+            ]
+        )
+
+        source = AkshareSource()
+        nav_data = source.fetch_nav("510300")
+
+        # 只应保留有效净值（4.118 和 4.125），NaN 和 None 应被过滤
+        assert len(nav_data) == 2
+        assert nav_data[0] == {"date": "2026-04-01", "nav": 4.118}
+        assert nav_data[1] == {"date": "2026-04-03", "nav": 4.125}
+
+    @patch("engine.data.akshare_source.ak")
+    def test_all_nan_nav_returns_empty(self, mock_ak):
+        """所有净值都是 NaN 时应返回空列表"""
+        import numpy as np
+        from engine.data.akshare_source import AkshareSource
+
+        mock_ak.fund_etf_fund_info_em.return_value = pd.DataFrame(
+            [
+                {"净值日期": "2026-04-01", "单位净值": np.nan},
+                {"净值日期": "2026-04-02", "单位净值": float("nan")},
+            ]
+        )
+
+        source = AkshareSource()
+        nav_data = source.fetch_nav("510300")
+
+        assert nav_data == []
+
+
 class TestEmSourceSkipAfterConsecutiveFailures:
     """em 数据源连续失败后应跳过 em，直接使用 sina"""
 
