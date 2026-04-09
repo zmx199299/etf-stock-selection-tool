@@ -1,6 +1,6 @@
 [package]
 name = "etf-analyzer"
-version = "0.0.13"
+version = "0.0.14"
 description = "ETF Analyzer Desktop App"
 authors = ["you"]
 edition = "2021"

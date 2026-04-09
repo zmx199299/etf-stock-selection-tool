@@ -2,6 +2,7 @@
 import sqlite3
 from typing import Optional
 
+
 class Database:
     def __init__(self, db_path: str):
         self.db_path = db_path
@@ -103,7 +104,8 @@ class Database:
         for f in funds:
             record = dict(f)
             record.setdefault("has_market_data", 1)
-            c.execute("""
+            c.execute(
+                """
                 INSERT INTO fund_info (code,name,fund_type,invest_type,t_plus,list_date,is_excluded,has_market_data)
                 VALUES (:code,:name,:fund_type,:invest_type,:t_plus,:list_date,:is_excluded,:has_market_data)
                 ON CONFLICT(code) DO UPDATE SET
@@ -111,7 +113,9 @@ class Database:
                     invest_type=excluded.invest_type, t_plus=excluded.t_plus,
                     list_date=excluded.list_date, is_excluded=excluded.is_excluded,
                     has_market_data=excluded.has_market_data
-            """, record)
+            """,
+                record,
+            )
         self.conn.commit()
 
     def get_fund_info(self, code: str) -> Optional[dict]:
@@ -130,10 +134,16 @@ class Database:
         c.execute("SELECT * FROM fund_info WHERE is_excluded=0 AND has_market_data=1")
         return [dict(r) for r in c.fetchall()]
 
+    def has_daily_quotes(self) -> bool:
+        c = self.conn.cursor()
+        c.execute("SELECT 1 FROM daily_quote LIMIT 1")
+        return c.fetchone() is not None
+
     def upsert_daily_quotes(self, quotes: list[dict]):
         c = self.conn.cursor()
         for q in quotes:
-            c.execute("""
+            c.execute(
+                """
                 INSERT INTO daily_quote
                     (code,date,open,close,high,low,volume,amount,
                      nav,premium_rate,prev_close,is_suspended,suspended_days)
@@ -147,14 +157,16 @@ class Database:
                     prev_close=excluded.prev_close,
                     is_suspended=excluded.is_suspended,
                     suspended_days=excluded.suspended_days
-            """, q)
+            """,
+                q,
+            )
         self.conn.commit()
 
     def get_daily_quotes(self, code: str, start: str, end: str) -> list[dict]:
         c = self.conn.cursor()
         c.execute(
             "SELECT * FROM daily_quote WHERE code=? AND date>=? AND date<=? ORDER BY date",
-            (code, start, end)
+            (code, start, end),
         )
         return [dict(r) for r in c.fetchall()]
 
@@ -197,7 +209,7 @@ class Database:
                 premium_rate = (close_price - nav) / nav
             c.execute(
                 "UPDATE daily_quote SET nav=?, premium_rate=? WHERE code=? AND date=?",
-                (nav, premium_rate, code, date)
+                (nav, premium_rate, code, date),
             )
         self.conn.commit()
 
@@ -208,7 +220,9 @@ class Database:
         c.execute("UPDATE fund_info SET has_market_data=? WHERE code=?", (value, code))
         self.conn.commit()
 
-    def update_daily_quote_nav_and_premium(self, code: str, date: str, nav: float, premium_rate: float | None = None):
+    def update_daily_quote_nav_and_premium(
+        self, code: str, date: str, nav: float, premium_rate: float | None = None
+    ):
         c = self.conn.cursor()
         c.execute("SELECT close FROM daily_quote WHERE code=? AND date=?", (code, date))
         row = c.fetchone()
@@ -218,7 +232,7 @@ class Database:
                 premium_rate = (close_price - nav) / nav
             c.execute(
                 "UPDATE daily_quote SET nav=?, premium_rate=? WHERE code=? AND date=?",
-                (nav, premium_rate, code, date)
+                (nav, premium_rate, code, date),
             )
             self.conn.commit()
 
@@ -226,7 +240,8 @@ class Database:
         """批量插入或更新分钟线数据"""
         c = self.conn.cursor()
         for q in quotes:
-            c.execute("""
+            c.execute(
+                """
                 INSERT INTO minute_quote
                     (code, datetime, period, open, close, high, low, volume, amount)
                 VALUES
@@ -235,15 +250,19 @@ class Database:
                     open=excluded.open, close=excluded.close,
                     high=excluded.high, low=excluded.low,
                     volume=excluded.volume, amount=excluded.amount
-            """, q)
+            """,
+                q,
+            )
         self.conn.commit()
 
-    def get_minute_quotes(self, code: str, period: str, start: str, end: str) -> list[dict]:
+    def get_minute_quotes(
+        self, code: str, period: str, start: str, end: str
+    ) -> list[dict]:
         """查询分钟线数据"""
         c = self.conn.cursor()
         c.execute(
             "SELECT * FROM minute_quote WHERE code=? AND period=? AND datetime>=? AND datetime<=? ORDER BY datetime",
-            (code, period, start, end)
+            (code, period, start, end),
         )
         return [dict(r) for r in c.fetchall()]
 
@@ -252,7 +271,7 @@ class Database:
         c = self.conn.cursor()
         c.execute(
             "SELECT MAX(datetime) FROM minute_quote WHERE code=? AND period=?",
-            (code, period)
+            (code, period),
         )
         row = c.fetchone()
         return row[0] if row and row[0] else None
@@ -260,7 +279,8 @@ class Database:
     def aggregate_120m_from_60m(self, code: str) -> list[dict]:
         """从 60 分钟线聚合 120 分钟线数据"""
         c = self.conn.cursor()
-        c.execute("""
+        c.execute(
+            """
             SELECT
                 code,
                 CASE
@@ -287,19 +307,23 @@ class Database:
             )
             GROUP BY code, SUBSTR(datetime, 1, 10), session
             ORDER BY datetime
-        """, (code,))
+        """,
+            (code,),
+        )
 
         results = []
         for row in c.fetchall():
-            results.append({
-                "code": row[0],
-                "datetime": row[1],
-                "period": row[2],
-                "open": row[3],
-                "close": row[4],
-                "high": row[5],
-                "low": row[6],
-                "volume": row[7],
-                "amount": row[8],
-            })
+            results.append(
+                {
+                    "code": row[0],
+                    "datetime": row[1],
+                    "period": row[2],
+                    "open": row[3],
+                    "close": row[4],
+                    "high": row[5],
+                    "low": row[6],
+                    "volume": row[7],
+                    "amount": row[8],
+                }
+            )
         return results

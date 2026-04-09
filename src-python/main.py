@@ -16,14 +16,15 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
-def background_sync(db_path, source):
-    """如果数据库为空，在后台默默进行首次全市场 ETF+LOF 同步（仅最近60天）。
-    使用独立的数据库连接，避免与主线程 SQLite 连接冲突。"""
-    logger.info("Database is empty. Starting background sync (last 60 days)...")
+def background_sync(db_path):
+    """如果数据库日线为空，在后台默默进行首次全市场 ETF+LOF 同步（仅最近60天）。
+    使用独立的数据库连接和数据源实例，避免与主线程资源冲突。"""
+    logger.info("Daily quotes missing. Starting background sync (last 60 days)...")
     try:
         bg_db = Database(db_path)
         bg_db.init()
-        pipeline = DataSyncPipeline(bg_db, source)
+        bg_source = AkshareSource()
+        pipeline = DataSyncPipeline(bg_db, bg_source)
         pipeline.sync_all(limit_days=60)
         logger.info("Background sync completed successfully.")
         bg_db.close()
@@ -32,6 +33,9 @@ def background_sync(db_path, source):
 
 
 def main():
+    # 强制 stderr 行缓冲，确保日志在重定向到文件时即时写入
+    sys.stderr.reconfigure(line_buffering=True)
+
     logger.info("Starting Python ETF Engine...")
 
     # 1. 确定数据库存放路径（针对生产环境打包后的独立数据目录）
@@ -45,14 +49,16 @@ def main():
     db.init()  # 必须显式调用：连接数据库并创建表结构
     source = AkshareSource()
 
-    # 3. 检查数据库是否为空，如果为空，启动后台线程进行初始化同步
+    # 3. 检查日线数据是否为空（覆盖"基金列表已存在但日线同步失败"的场景）
     try:
-        funds = db.get_all_funds_with_market_data()
-        if not funds:
+        if not db.has_daily_quotes():
             sync_thread = threading.Thread(
-                target=background_sync, args=(db_path, source), daemon=True
+                target=background_sync, args=(db_path,), daemon=True
             )
             sync_thread.start()
+            logger.info("Background sync thread started.")
+        else:
+            logger.info("Daily quotes already exist, skipping background sync.")
     except Exception as e:
         logger.error(f"Failed to check db state: {e}")
 

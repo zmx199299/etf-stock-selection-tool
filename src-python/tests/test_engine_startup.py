@@ -100,10 +100,10 @@ class TestMainModule:
 
 
 class TestBackgroundSyncThreadSafety:
-    """验证后台同步线程使用独立的数据库连接"""
+    """验证后台同步线程使用独立的数据库连接和数据源"""
 
-    def test_background_sync_creates_own_db_connection(self):
-        """background_sync 应在内部创建自己的 Database 实例，参数应为 db_path 而非 db 对象"""
+    def test_background_sync_creates_own_db_and_source(self):
+        """background_sync 应在内部创建自己的 Database 和 AkshareSource 实例"""
         if "main" in sys.modules:
             del sys.modules["main"]
         from main import background_sync
@@ -112,28 +112,185 @@ class TestBackgroundSyncThreadSafety:
         os.close(fd)
 
         try:
-            source = MagicMock()
-
-            # Patch Database 和 DataSyncPipeline 来验证 background_sync 内部行为
             with (
                 patch("main.Database") as mock_db_class,
+                patch("main.AkshareSource") as mock_source_class,
                 patch("main.DataSyncPipeline") as mock_pipeline_class,
             ):
                 mock_db_instance = MagicMock()
                 mock_db_class.return_value = mock_db_instance
+                mock_source_instance = MagicMock()
+                mock_source_class.return_value = mock_source_instance
                 mock_pipeline = MagicMock()
                 mock_pipeline_class.return_value = mock_pipeline
 
-                # 传入 db_path（字符串），background_sync 应在内部创建新 Database
-                background_sync(db_path, source)
+                background_sync(db_path)
 
-                # 验证 Database 在后台线程内部被创建并 init
                 mock_db_class.assert_called_once_with(db_path)
                 mock_db_instance.init.assert_called_once()
-
-                # 验证 DataSyncPipeline 使用的是新建的 db 实例
-                mock_pipeline_class.assert_called_once_with(mock_db_instance, source)
+                mock_source_class.assert_called_once()
+                mock_pipeline_class.assert_called_once_with(
+                    mock_db_instance, mock_source_instance
+                )
                 mock_pipeline.sync_all.assert_called_once_with(limit_days=60)
         finally:
             if os.path.exists(db_path):
                 os.unlink(db_path)
+
+
+class TestDatabaseHasDailyQuotes:
+    """验证 Database.has_daily_quotes() 方法"""
+
+    def test_returns_false_on_empty_db(self, tmp_path):
+        """空数据库应返回 False"""
+        db = Database(str(tmp_path / "test.db"))
+        db.init()
+        assert db.has_daily_quotes() is False
+        db.close()
+
+    def test_returns_true_after_insert(self, tmp_path):
+        """插入日线数据后应返回 True"""
+        db = Database(str(tmp_path / "test.db"))
+        db.init()
+        db.upsert_fund_info(
+            [
+                {
+                    "code": "510300",
+                    "name": "沪深300ETF",
+                    "fund_type": "ETF",
+                    "invest_type": "指数型",
+                    "t_plus": "T+1",
+                    "list_date": "2020-01-01",
+                    "is_excluded": 0,
+                }
+            ]
+        )
+        db.upsert_daily_quotes(
+            [
+                {
+                    "code": "510300",
+                    "date": "2026-04-01",
+                    "open": 4.0,
+                    "close": 4.1,
+                    "high": 4.2,
+                    "low": 3.9,
+                    "volume": 10000,
+                    "amount": 41000,
+                    "nav": None,
+                    "premium_rate": None,
+                    "prev_close": None,
+                    "is_suspended": 0,
+                    "suspended_days": 0,
+                }
+            ]
+        )
+        assert db.has_daily_quotes() is True
+        db.close()
+
+    def test_fund_info_without_daily_quotes_returns_false(self, tmp_path):
+        """有基金列表但无日线数据时应返回 False — 这是 v0.0.13 的核心 bug 场景"""
+        db = Database(str(tmp_path / "test.db"))
+        db.init()
+        db.upsert_fund_info(
+            [
+                {
+                    "code": "510300",
+                    "name": "沪深300ETF",
+                    "fund_type": "ETF",
+                    "invest_type": "指数型",
+                    "t_plus": "T+1",
+                    "list_date": "2020-01-01",
+                    "is_excluded": 0,
+                },
+                {
+                    "code": "159915",
+                    "name": "创业板ETF",
+                    "fund_type": "ETF",
+                    "invest_type": "指数型",
+                    "t_plus": "T+1",
+                    "list_date": "2020-01-01",
+                    "is_excluded": 0,
+                },
+            ]
+        )
+        assert db.has_daily_quotes() is False
+        db.close()
+
+    def test_fund_info_without_daily_quotes_returns_false(self, tmp_path):
+        """有基金列表但无日线数据时应返回 False — 这是 v0.0.13 的核心 bug 场景"""
+        db = Database(str(tmp_path / "test.db"))
+        db.init()
+        db.upsert_fund_info(
+            [
+                {
+                    "code": "510300",
+                    "name": "沪深300ETF",
+                    "fund_type": "ETF",
+                    "invest_type": "指数型",
+                    "t_plus": "T+1",
+                    "list_date": "2020-01-01",
+                    "is_excluded": 0,
+                },
+                {
+                    "code": "159915",
+                    "name": "创业板ETF",
+                    "fund_type": "ETF",
+                    "invest_type": "指数型",
+                    "t_plus": "T+1",
+                    "list_date": "2020-01-01",
+                    "is_excluded": 0,
+                },
+            ]
+        )
+        assert db.has_daily_quotes() is False
+        db.close()
+
+
+class TestBackgroundSyncTrigger:
+    """验证后台同步的触发条件：基于 daily_quote 是否为空"""
+
+    def test_sync_triggers_when_fund_info_exists_but_no_daily_quotes(self, tmp_path):
+        """fund_info 有数据但 daily_quote 为空时，应触发后台同步"""
+        if "main" in sys.modules:
+            del sys.modules["main"]
+        from main import main
+
+        db_path = str(tmp_path / "test.db")
+        app_dir = str(tmp_path)
+
+        # 预先创建数据库并插入基金列表（模拟 v0.0.12 遗留状态）
+        db = Database(db_path)
+        db.init()
+        db.upsert_fund_info(
+            [
+                {
+                    "code": "510300",
+                    "name": "沪深300ETF",
+                    "fund_type": "ETF",
+                    "invest_type": "指数型",
+                    "t_plus": "T+1",
+                    "list_date": "2020-01-01",
+                    "is_excluded": 0,
+                },
+            ]
+        )
+        db.close()
+
+        with (
+            patch("main.os.path.expanduser", return_value=app_dir),
+            patch("main.os.path.join", return_value=db_path),
+            patch("main.os.makedirs"),
+            patch("main.AkshareSource") as mock_source_class,
+            patch("main.create_real_server") as mock_server_factory,
+            patch("main.threading.Thread") as mock_thread_class,
+        ):
+            mock_server = MagicMock()
+            mock_server_factory.return_value = mock_server
+            mock_thread = MagicMock()
+            mock_thread_class.return_value = mock_thread
+
+            main()
+
+            # 关键断言：后台同步线程应该被创建并启动
+            mock_thread_class.assert_called_once()
+            mock_thread.start.assert_called_once()
